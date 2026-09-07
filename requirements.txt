@@ -1,0 +1,5 @@
+longport==4.3.7
+streamlit>=1.40
+pandas>=2.0
+python-dotenv>=1.0
+pytz>=2024.1

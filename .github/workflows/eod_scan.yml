@@ -1,0 +1,47 @@
+name: eod_scan
+
+# 每個交易日 HKT 16:35 跑訊號 A（UTC 08:35）；Actions cron 慢 5–15 分鐘可接受
+on:
+  schedule:
+    - cron: "35 8 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  eod:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      - name: Ensure universe.csv
+        env:
+          LONGPORT_APP_KEY: ${{ secrets.LONGPORT_APP_KEY }}
+          LONGPORT_APP_SECRET: ${{ secrets.LONGPORT_APP_SECRET }}
+          LONGPORT_ACCESS_TOKEN: ${{ secrets.LONGPORT_ACCESS_TOKEN }}
+        run: |
+          if [ ! -f data/universe.csv ]; then python -m stockscan.universe; fi
+
+      - name: Run EOD scan (訊號 A)
+        env:
+          LONGPORT_APP_KEY: ${{ secrets.LONGPORT_APP_KEY }}
+          LONGPORT_APP_SECRET: ${{ secrets.LONGPORT_APP_SECRET }}
+          LONGPORT_ACCESS_TOKEN: ${{ secrets.LONGPORT_ACCESS_TOKEN }}
+        run: python scripts/run_eod.py
+
+      - name: Commit radar CSV
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/eod data/universe.csv
+          git diff --cached --quiet || git commit -m "EOD scan $(date -u +%F_%H:%M UTC)"
+          git push

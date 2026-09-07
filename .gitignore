@@ -1,0 +1,13 @@
+# secrets — 唔准 commit
+.env
+.streamlit/secrets.toml
+
+# 執行狀態同 log
+state/*.json
+logs/
+
+# python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
