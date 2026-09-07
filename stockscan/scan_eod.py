@@ -3,27 +3,35 @@
 條件：mcap_total < MCAP_CAP_EOD　且　turnover_day > TURNOVER_MIN
 　　且　turnover_day ÷ 前 MA_DAYS 個交易日成交額均值 ≥ RATIO_MIN（均值唔含今日）
 輸出 data/eod/radar_eod_YYYYMMDD.csv，按市值由細到大排（照 RTSS）。
+
+P1 起數據層行日線快取（stockscan/kline_cache.py）：
+先讀 data/cache/daily/{code5}.csv → 尾支舊過 scan_date 先拉（即市K線端點，獨立配額）→ 計算。
+cache_only=True 時零 API（20 日回填用）。
+301607（歷史K線 100 標的配額）爆咗就用現有快取繼續計，唔好燒 retry。
 """
 from __future__ import annotations
 
 import json
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, timedelta
 
 import pandas as pd
 
 from config import (
-    CANDLE_WORKERS,
     EOD_DIR,
     FIXTURE_DIR,
+    LOGS_DIR,
     MA_DAYS,
     MCAP_CAP_EOD,
     RATIO_MIN,
     RTSS_FIXTURE_DATE,
     TURNOVER_MIN,
     UNIVERSE_CSV,
+    WINDOW_BARS,
 )
-from stockscan.calendar_hk import last_trading_day, trading_days
+from stockscan import kline_cache
+from stockscan.calendar_hk import trading_days
 from stockscan.io_utils import (
     ensure_dirs,
     lb_to_code5,
@@ -42,7 +50,7 @@ OUT_COLUMNS = [
 
 
 def calc_ma(turnovers: list[float], max_days: int = MA_DAYS) -> tuple[float | None, int]:
-    """前 max_days 個交易日成交額均值（唔含今日——呼叫方傳入嘅 list 已唔含今日）。
+    """前 max_days 個交易日成交額均值（唔含今日——傳入 list 已唔含今日）。
     支數不足照計，回傳 (均值, 實際支數)；一支都冇回 (None, 0)。"""
     vals = [t for t in turnovers if t is not None][-max_days:]
     if not vals:
@@ -65,64 +73,109 @@ def resolve_scan_date(lb, date_arg: date | None) -> date:
     return days[-1]
 
 
-def _fetch_candles(lb, symbols: list[str], scan_date: date, is_today: bool) -> dict[str, list]:
-    """逐隻攞日 K（11 支）。SDK 無批量 kline，用細線程池控制節奏，429 交 lb_client 退避。"""
-    out: dict[str, list] = {}
-    errors: list[str] = []
+class _QuotaAbort(Exception):
+    """301607 配額爆——即刻收手。"""
+
+
+def _is_quota_err(e: Exception) -> bool:
+    return "301607" in str(e) or "out of limit" in str(e).lower()
+
+
+def ensure_cache(lb, symbols: list[str], scan_date: date,
+                 workers: int = 2, stats: dict | None = None) -> None:
+    """快取尾支舊過 scan_date 嘅先拉。resumable：拉得幾多存幾多（{code5}.csv 落地）。"""
+    need = []
+    for sym in symbols:
+        df = kline_cache.load(lb_to_code5(sym))
+        if df is None or df["date"].iloc[-1] < scan_date.isoformat():
+            need.append(sym)
+    if stats is not None:
+        stats["api_calls_planned"] = len(need)
+    if not need:
+        print(f"[cache] 快取全部新鮮（{len(symbols)} 隻），零 API。")
+        return
+
+    print(f"[cache] 快取過期／缺失 {len(need)}/{len(symbols)} 隻，"
+          f"拉最近 {WINDOW_BARS} 支（{workers} 線程）…")
 
     def one(sym: str):
         try:
-            if is_today:
-                return sym, lb.candles_today(sym, MA_DAYS + 1)
-            return sym, lb.candles_by_date(sym, scan_date, MA_DAYS + 1)
-        except Exception as e:  # noqa: BLE001
-            errors.append(sym)
-            log_error("eod.candles", f"{sym}: {e!r}")
+            bars = kline_cache.fetch_window(lb, sym, WINDOW_BARS)
+            if stats is not None:
+                stats["api_calls"] = stats.get("api_calls", 0) + 1
+            if bars:
+                kline_cache.merge_save(lb_to_code5(sym), bars)
             return sym, None
+        except Exception as e:  # noqa: BLE001
+            if stats is not None and ("429" in str(e) or "limit" in str(e).lower()):
+                stats["throttled"] = stats.get("throttled", 0) + 1
+            if _is_quota_err(e):
+                return sym, _QuotaAbort(str(e))
+            log_error("cache.fetch", f"{sym}: {e!r}")
+            return sym, e
 
-    with ThreadPoolExecutor(max_workers=CANDLE_WORKERS) as ex:
-        futs = [ex.submit(one, s) for s in symbols]
-        for i, f in enumerate(as_completed(futs), 1):
-            sym, rows = f.result()
-            if rows:
-                out[sym] = rows
-            if i % 200 == 0:
-                print(f"[scan_eod] 日 K 進度 {i}/{len(symbols)}，失敗 {len(errors)}")
-    if errors:
-        print(f"[scan_eod] 日 K 失敗共 {len(errors)} 隻（詳情 logs/）")
-    return out
+    done = 0
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        futs = [ex.submit(one, s) for s in need]
+        for f in as_completed(futs):
+            sym, err = f.result()
+            done += 1
+            if isinstance(err, _QuotaAbort):
+                log_error("cache.fetch", f"{sym}: 301607 quota——暫停拉數，用現有快取頂住")
+                raise err
+            if done % 200 == 0:
+                print(f"[cache] 進度 {done}/{len(need)}")
+    print(f"[cache] 拉數完成 {done} 隻")
 
 
-def build_eod(lb, date_arg: date | None = None) -> tuple[pd.DataFrame, dict]:
+def build_eod(lb, date_arg: date | None = None, cache_only: bool = False,
+              codes: list[str] | None = None, workers: int = 2) -> tuple[pd.DataFrame, dict]:
+    stats: dict = {"api_calls": 0, "throttled": 0}
+    t0 = time.perf_counter()
+
     uni = read_csv_if_exists(UNIVERSE_CSV)
     if uni.empty:
         raise SystemExit("data/universe.csv 唔存在——先跑 `python -m stockscan.universe`。")
     uni = uni[uni["in_scan"] == 1].copy()
+    if codes:
+        want = {c.zfill(5) for c in codes}
+        uni = uni[uni["code5"].isin(want)]
     shares = dict(zip(uni["symbol_lb"], pd.to_numeric(uni["total_shares"], errors="coerce")))
     hk_sh = dict(zip(uni["symbol_lb"], pd.to_numeric(uni["hk_shares"], errors="coerce")))
     dom = dict(zip(uni["symbol_lb"], uni["has_domestic_shares"].fillna(0).astype(int)))
     names = dict(zip(uni["symbol_lb"], uni["name_hk"].fillna(uni["name_seed"])))
 
-    scan_date = resolve_scan_date(lb, date_arg)
-    is_today = scan_date == today_hkt()
-    print(f"[scan_eod] 掃描交易日：{scan_date}（{'今日即市 bar' if is_today else '歷史 by_date'}），"
-          f"宇宙 {len(uni)} 隻")
+    if cache_only:
+        scan_date = date_arg or today_hkt()
+    else:
+        scan_date = resolve_scan_date(lb, date_arg)
+    print(f"[scan_eod] 掃描交易日：{scan_date}，宇宙 {len(uni)} 隻"
+          f"{'（純快取模式，零 API）' if cache_only else ''}")
 
-    candles = _fetch_candles(lb, uni["symbol_lb"].tolist(), scan_date, is_today)
+    if not cache_only:
+        try:
+            ensure_cache(lb, uni["symbol_lb"].tolist(), scan_date,
+                         workers=workers, stats=stats)
+        except _QuotaAbort:
+            print("[scan_eod] ⚠ 配額爆——用現有快取繼續計，缺嘅統計落 no_cache。")
 
     rows = []
-    stale = 0
-    for sym, bars in candles.items():
-        if not bars:
+    no_cache = stale = 0
+    for sym in uni["symbol_lb"]:
+        df = kline_cache.load(lb_to_code5(sym))
+        if df is None:
+            no_cache += 1
             continue
-        if bars[-1].timestamp.date() != scan_date:
-            stale += 1  # 最後一支唔係 scan_date（停牌／新上市等）——照用最後一支，記數
-        tday = bars[-1]
-        prevs = bars[:-1]
-        close = float(tday.close)
-        prev_close = float(prevs[-1].close) if prevs else None
-        turnover_day = float(tday.turnover)
-        ma, n_avail = calc_ma([float(b.turnover) for b in prevs])
+        win = kline_cache.window_upto(df, scan_date, MA_DAYS + 1)
+        if len(win) == 0 or win["date"].iloc[-1] != scan_date.isoformat():
+            stale += 1  # scan 日無 bar（停牌／未上市／快取唔夠新）
+            continue
+        tday = win.iloc[-1]
+        prevs = win.iloc[:-1]
+        close = float(tday["close"])
+        prev_close = float(prevs["close"].iloc[-1]) if len(prevs) else None
+        turnover_day = float(tday["turnover"])
+        ma, n_avail = calc_ma([float(t) for t in prevs["turnover"]])
         ratio = calc_ratio(turnover_day, ma)
         ts_total = shares.get(sym)
         if not close or not ts_total or ts_total <= 0 or ratio is None:
@@ -155,19 +208,29 @@ def build_eod(lb, date_arg: date | None = None) -> tuple[pd.DataFrame, dict]:
                       columns=OUT_COLUMNS)
     df = df.sort_values("mcap_total").reset_index(drop=True)  # 市值由細到大（照 RTSS）
 
-    meta = {
+    stats.update({
         "scan_date": str(scan_date),
         "universe": int(len(uni)),
-        "with_candles": int(len(candles)),
-        "stale_last_bar": stale,
+        "no_cache": no_cache,
+        "no_bar_on_date": stale,
         "hits": int(len(df)),
-        "scan_time": ts_hkt(),
-        "thresholds": {
-            "mcap_cap": MCAP_CAP_EOD, "turnover_min": TURNOVER_MIN,
-            "ma_days": MA_DAYS, "ratio_min": RATIO_MIN,
-        },
-    }
-    return df, meta
+        "elapsed_s": round(time.perf_counter() - t0, 1),
+    })
+    _log_run_stats("scan_eod", stats)
+    return df, stats
+
+
+def _log_run_stats(what: str, stats: dict) -> None:
+    ensure_dirs()
+    p = LOGS_DIR / "run_stats.csv"
+    header = not p.exists()
+    with open(p, "a", encoding="utf-8") as f:
+        if header:
+            f.write("ts,what,scan_date,universe,api_calls,throttled,hits,elapsed_s\n")
+        f.write(f"{ts_hkt()},{what},{stats.get('scan_date', '')},"
+                f"{stats.get('universe', '')},{stats.get('api_calls', 0)},"
+                f"{stats.get('throttled', 0)},{stats.get('hits', '')},"
+                f"{stats.get('elapsed_s', '')}\n")
 
 
 def compare_rtss(radar_csv, fixture_date: str = RTSS_FIXTURE_DATE) -> dict:
@@ -196,12 +259,15 @@ def compare_rtss(radar_csv, fixture_date: str = RTSS_FIXTURE_DATE) -> dict:
     return res
 
 
-def run(lb, date_arg: date | None = None) -> tuple[pd.DataFrame, dict]:
+def run(lb, date_arg: date | None = None, cache_only: bool = False,
+        codes: list[str] | None = None, workers: int = 2) -> tuple[pd.DataFrame, dict]:
     ensure_dirs()
-    df, meta = build_eod(lb, date_arg)
+    df, meta = build_eod(lb, date_arg, cache_only=cache_only, codes=codes, workers=workers)
     fname = f"radar_eod_{date.fromisoformat(meta['scan_date']):%Y%m%d}.csv"
     path = write_csv(df, EOD_DIR / fname)
-    print(f"[scan_eod] 命中 {len(df)} 隻 → {path}")
+    print(f"[scan_eod] 命中 {len(df)} 隻 → {path}"
+          f"（API calls {meta.get('api_calls', 0)}，throttled {meta.get('throttled', 0)}，"
+          f"耗時 {meta['elapsed_s']}s）")
 
     if meta["scan_date"].replace("-", "") == RTSS_FIXTURE_DATE:
         res = compare_rtss(path)

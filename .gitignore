@@ -11,3 +11,11 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .venv/
+
+# KL 原始金鑰檔（Drive 版）——一樣唔准 commit
+LONGBRIDGE_APP.ENV
+desktop.ini
+*.env
+
+# 日線快取：1,500+ 細檔，Drive 已同步；Actions 每日全量重拉即市窗，入 git 冇著數
+data/cache/

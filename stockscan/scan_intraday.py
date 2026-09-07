@@ -1,25 +1,38 @@
-"""訊號 B：即市急升異動＋「當日第 N 次」狀態機（門檻全部喺 config.py）。
+"""訊號 B：即市異動（P3 升級版）——兩種觸發，各自計「當日第 N 次」。
 
-條件：mcap_now < MCAP_CAP_INTRA　且　turnover_intraday ≥ TURNOVER_MIN
-　　且　chg_pct ≥ INTRA_FIRST_PCT；之後每多升 INTRA_STEP_PCT 再發一次。
-級距 = floor(chg_pct / STEP) × STEP；記「level_from→level_to」同 count_today。
-預篩用 min(prev_close, last_done) × total_shares（一輪 quote 過晒，慳 static 呼叫）。
+SURGE（急升，原訊號 B）：mcap_now < MCAP_CAP_INTRA　且　turnover_intraday ≥ INTRA_TURNOVER_MIN
+　　且　chg_pct ≥ INTRA_FIRST_PCT；之後每多升 INTRA_STEP_PCT 再發（級距 floor(chg/20)×20）。
+VOLUME（即市爆量，P3 新增，＝A 嘅邏輯搬上即市）：同上門檻
+　　且　turnover_intraday ÷ ma10 ≥ INTRA_VOL_FIRST；每多 INTRA_VOL_STEP 倍再發。
+
+ma10 由 P1 日線快取取（嚴格取 scan 日之前 10 個交易日，收市後先更新到當日）。
+預篩：min(prev_close, last_done) × total_shares < MCAP_CAP_INTRA（一輪 quote 過晒）。
+狀態檔 state/intraday_state_YYYYMMDD.json：
+    {symbol: {"SURGE": {...}, "VOLUME": {...},
+              "first_seen_price": x, "first_seen_turnover": y, "first_seen_ts": "..."}}
 """
 from __future__ import annotations
 
 import math
+import time
 from datetime import date
 
 import pandas as pd
 
 from config import (
     INTRA_FIRST_PCT,
+    INTRA_POLL_SEC,
     INTRA_STEP_PCT,
+    INTRA_TURNOVER_MIN,
+    INTRA_VOL_FIRST,
+    INTRA_VOL_STEP,
+    LOGS_DIR,
+    MA_DAYS,
     MCAP_CAP_INTRA,
-    TURNOVER_MIN,
     UNIVERSE_CSV,
 )
-from stockscan.calendar_hk import in_continuous_session
+from stockscan import kline_cache
+from stockscan.calendar_hk import in_scan_session
 from stockscan.io_utils import (
     append_csv,
     ensure_dirs,
@@ -32,30 +45,28 @@ from stockscan.io_utils import (
 )
 
 ALERT_COLUMNS = [
-    "ts", "code5", "symbol", "name", "count_today",
+    "ts", "code5", "symbol", "name", "alert_type", "count_today",
     "level_from", "level_to", "chg_pct", "last_done",
-    "turnover_intraday", "mcap_now", "off_hours",
+    "turnover_intraday", "mcap_now", "ratio_intraday", "off_hours",
 ]
 
 
-def level_of(chg_pct: float, step: float = INTRA_STEP_PCT) -> int:
-    """升幅級距：floor(chg/step)×step；負數或零回 0。"""
-    if chg_pct <= 0:
+def level_of(value: float, first: float, step: float) -> int:
+    """級距：value ≥ first 先有級；之後每 step 一級（20→20、41→40、10x→10、25x→20）。"""
+    if value < first:
         return 0
-    return int(math.floor(chg_pct / step)) * int(step)
+    return int(first) + int(math.floor((value - first) / step)) * int(step)
 
 
-def decide_alert(rec: dict | None, chg_pct: float,
-                 first: float = INTRA_FIRST_PCT, step: float = INTRA_STEP_PCT) -> tuple[bool, int, int]:
-    """狀態機：無紀錄且 chg≥first → 出；有紀錄且新級距 > 已記級距 → 出。
-    回傳 (要唔要 alert, level_from, level_to)。"""
-    if chg_pct < first:
+def decide_alert(rec: dict | None, value: float, first: float, step: float) -> tuple[bool, int, int]:
+    """狀態機：無紀錄且 value≥first → 出；有紀錄且新級距 > 已記級距 → 出。
+    回傳 (要唔要 alert, level_from, level_to)。rec 係該 alert_type 嘅舊狀態。"""
+    if value < first:
         return False, 0, 0
-    new_level = level_of(chg_pct, step)
-    if rec is None:
-        return True, 0, new_level
-    if new_level > int(rec.get("level", 0)):
-        return True, int(rec.get("level", 0)), new_level
+    new_level = level_of(value, first, step)
+    old_level = int(rec.get("level", 0)) if rec else 0
+    if new_level > old_level:
+        return True, old_level, new_level
     return False, 0, 0
 
 
@@ -68,9 +79,25 @@ def _load_universe() -> pd.DataFrame:
     return uni
 
 
+def ma10_from_cache(code5: str, scan_date: date) -> float | None:
+    """快取入面 scan_date 之前 10 個交易日成交額均值（唔含 scan 日／即市）。"""
+    df = kline_cache.load(code5)
+    if df is None:
+        return None
+    prev = df[df["date"] < scan_date.isoformat()].tail(MA_DAYS)
+    if prev.empty:
+        return None
+    vals = [float(t) for t in prev["turnover"] if pd.notna(t)]
+    if not vals:
+        return None
+    return sum(vals) / len(vals)
+
+
 def scan_once(lb, scan_date: date | None = None) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
     """掃一次即市。回傳 (alerts_df, 近門檻榜 near_df, meta)。alert 追加寫 CSV＋更新狀態檔。"""
     ensure_dirs()
+    t0 = time.perf_counter()
+    d = scan_date or now_hkt().date()
     uni = _load_universe()
     shares = dict(zip(uni["symbol_lb"], uni["total_shares"]))
     names = dict(zip(uni["symbol_lb"], uni["name_hk"].fillna(uni["name_seed"])))
@@ -84,9 +111,8 @@ def scan_once(lb, scan_date: date | None = None) -> tuple[pd.DataFrame, pd.DataF
         last = float(q.last_done or 0)
         if not prev or not last or not ts_total or ts_total <= 0:
             continue
-        # 預篩：min(prev,last)×shares < cap——唔會走漏任何可能合資格嘅
         if min(prev, last) * ts_total >= MCAP_CAP_INTRA:
-            continue
+            continue  # 預篩：唔會走漏任何可能合資格嘅
         pool[sym] = {
             "prev_close": prev, "last_done": last,
             "turnover": float(q.turnover or 0),
@@ -94,39 +120,44 @@ def scan_once(lb, scan_date: date | None = None) -> tuple[pd.DataFrame, pd.DataF
             "mcap_now": last * ts_total,
         }
 
-    state = load_state(scan_date or now_hkt().date())
-    off_hours = 0 if in_continuous_session() else 1
+    state = load_state(d)
+    off_hours = 0 if in_scan_session() else 1
     alerts: list[dict] = []
     for sym, p in sorted(pool.items(), key=lambda kv: -kv[1]["chg_pct"]):
-        fire, lv_from, lv_to = decide_alert(state.get(sym), p["chg_pct"])
-        if not fire:
+        turnover = p["turnover"]
+        if turnover < INTRA_TURNOVER_MIN:
             continue
-        count = int(state.get(sym, {}).get("count", 0)) + 1
-        t = now_hkt()
-        alerts.append({
-            "ts": t.strftime("%Y-%m-%d %H:%M:%S"),
-            "code5": lb_to_code5(sym),
-            "symbol": sym,
-            "name": names.get(sym, sym),
-            "count_today": count,
-            "level_from": lv_from,
-            "level_to": lv_to,
-            "chg_pct": round(p["chg_pct"], 2),
-            "last_done": p["last_done"],
-            "turnover_intraday": round(p["turnover"]),
-            "mcap_now": round(p["mcap_now"]),
-            "off_hours": off_hours,
-        })
-        state[sym] = {
-            "level": lv_to, "count": count,
-            "last_alert": t.strftime("%H:%M:%S"),
-        }
+        rec_all = state.get(sym, {})
+        code5 = lb_to_code5(sym)
+        ma10 = ma10_from_cache(code5, d)
+        ratio = turnover / ma10 if ma10 and ma10 > 0 else None
+
+        # SURGE（急升）
+        fire, lv_from, lv_to = decide_alert(rec_all.get("SURGE"), p["chg_pct"],
+                                            INTRA_FIRST_PCT, INTRA_STEP_PCT)
+        if fire:
+            alerts.append(_mk_alert(sym, code5, names, "SURGE", rec_all, p,
+                                    lv_from, lv_to, ratio, off_hours))
+        # VOLUME（即市爆量）
+        if ratio is not None:
+            fire, lv_from, lv_to = decide_alert(rec_all.get("VOLUME"), ratio,
+                                                INTRA_VOL_FIRST, INTRA_VOL_STEP)
+            if fire:
+                alerts.append(_mk_alert(sym, code5, names, "VOLUME", rec_all, p,
+                                        lv_from, lv_to, ratio, off_hours))
 
     if alerts:
-        d = scan_date or now_hkt().date()
-        append_csv(pd.DataFrame(alerts, columns=ALERT_COLUMNS),
-                   _alerts_path(d))
-        save_state(scan_date or now_hkt().date(), state)
+        for a in alerts:  # 更新狀態（count 遞增已喺 _mk_alert 計好）
+            st = state.setdefault(a["symbol"], {})
+            st[a["alert_type"]] = {
+                "level": a["level_to"], "count": a["count_today"],
+                "last_alert": a["ts"].split(" ")[1],
+            }
+            st.setdefault("first_seen_price", a["last_done"])
+            st.setdefault("first_seen_turnover", a["turnover_intraday"])
+            st.setdefault("first_seen_ts", a["ts"])
+        save_state(d, state)
+        append_csv(pd.DataFrame(alerts, columns=ALERT_COLUMNS), _alerts_path(d))
 
     near = pd.DataFrame([
         {"code5": lb_to_code5(s), "name": names.get(s, s),
@@ -138,12 +169,45 @@ def scan_once(lb, scan_date: date | None = None) -> tuple[pd.DataFrame, pd.DataF
     meta = {
         "quoted": len(quotes), "pool": len(pool),
         "alerts": len(alerts), "off_hours": off_hours,
+        "elapsed_s": round(time.perf_counter() - t0, 1),
         "scan_time": ts_hkt(),
     }
+    _log_intraday_stats(meta)
     return pd.DataFrame(alerts, columns=ALERT_COLUMNS), near, meta
+
+
+def _mk_alert(sym, code5, names, alert_type, rec_all, p, lv_from, lv_to, ratio, off_hours):
+    t = now_hkt()
+    return {
+        "ts": t.strftime("%Y-%m-%d %H:%M:%S"),
+        "code5": code5,
+        "symbol": sym,
+        "name": names.get(sym, sym),
+        "alert_type": alert_type,
+        "count_today": int((rec_all.get(alert_type) or {}).get("count", 0)) + 1,
+        "level_from": lv_from,
+        "level_to": lv_to,
+        "chg_pct": round(p["chg_pct"], 2),
+        "last_done": p["last_done"],
+        "turnover_intraday": round(p["turnover"]),
+        "mcap_now": round(p["mcap_now"]),
+        "ratio_intraday": round(ratio, 2) if ratio is not None else "",
+        "off_hours": off_hours,
+    }
 
 
 def _alerts_path(d: date):
     from config import INTRADAY_DIR
 
     return INTRADAY_DIR / f"alerts_{d:%Y%m%d}.csv"
+
+
+def _log_intraday_stats(meta: dict) -> None:
+    ensure_dirs()
+    p = LOGS_DIR / "intraday_stats.csv"
+    header = not p.exists()
+    with open(p, "a", encoding="utf-8") as f:
+        if header:
+            f.write("ts,quoted,pool,alerts,off_hours,elapsed_s\n")
+        f.write(f"{meta['scan_time']},{meta['quoted']},{meta['pool']},"
+                f"{meta['alerts']},{meta['off_hours']},{meta['elapsed_s']}\n")

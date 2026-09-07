@@ -1,5 +1,5 @@
 """Longbridge (LongPort) OpenAPI 封裝：
-- 憑證讀取次序：st.secrets（Streamlit 內）→ .env → 環境變數
+- 憑證讀取次序：st.secrets（Streamlit 內）→ repo .env → %USERPROFILE%\\.stockscan\\.env → 環境變數
 - 分批（QUOTE_BATCH）＋限流指數退避（1,2,4,8s，最多 5 次重試）
 - 每個錯誤落 logs/，唔准 silent pass
 """
@@ -8,6 +8,7 @@ from __future__ import annotations
 import os
 import time
 from datetime import date, datetime, timedelta
+from pathlib import Path
 from typing import Callable, TypeVar
 
 from config import QUOTE_BATCH
@@ -30,22 +31,37 @@ class MissingCredentialsError(RuntimeError):
 
 
 def ensure_credentials() -> None:
-    """依規格書 H4 次序設定環境變數：st.secrets → .env → 環境變數。"""
+    """憑證讀取次序（P0 安全版）：
+    1) st.secrets（Streamlit Cloud）→ 2) repo .env（如存在）→
+    3) %USERPROFILE%\\.stockscan\\.env（正印位置，唔會被 Drive 同步上雲）→ 4) 環境變數。
+    LONGPORT_*／LONGBRIDGE_* 兩個前綴都認。"""
     try:  # 1) Streamlit secrets（本機無 streamlit runtime 會即 exception）
         import streamlit as st
 
         secrets = st.secrets
-        if all(k in secrets for k in REQUIRED_KEYS):
-            for k in REQUIRED_KEYS:
-                os.environ[k] = str(secrets[k])
+        wanted = ("APP_KEY", "APP_SECRET", "ACCESS_TOKEN")
+        found = [
+            k for k in map(str, tuple(secrets.keys()))
+            if k.upper().startswith(("LONGPORT_", "LONGBRIDGE_"))
+            and k.upper().endswith(wanted)
+        ]
+        if all(any(k.upper().endswith(w) for k in found) for w in wanted):
+            for k in found:
+                os.environ["LONGPORT_" + k.upper().split("_", 1)[1]] = str(secrets[k])
             return
     except Exception:
         pass
-    # 2) repo 根目錄 .env（python-dotenv 唔會覆蓋已存在嘅環境變數）
+
+    # 2) repo .env（可選）→ 3) 用者目錄 .stockscan\.env（正印）
     from dotenv import load_dotenv
 
-    load_dotenv()
-    # 3) LONGBRIDGE_ 前綴 alias → LONGPORT_（SDK 只認 LONGPORT_*）
+    load_dotenv()  # repo 根目錄（python-dotenv 唔會覆蓋已存在環境變數）
+    if not all(os.environ.get(k) for k in REQUIRED_KEYS):
+        home_env = Path.home() / ".stockscan" / ".env"
+        if home_env.exists():
+            load_dotenv(home_env, override=False)
+
+    # 4) LONGBRIDGE_ 前綴 alias → LONGPORT_（統一喺環境變數層面用 LONGPORT_*）
     for std, alias in _KEY_ALIASES.items():
         if not os.environ.get(std) and os.environ.get(alias):
             os.environ[std] = os.environ[alias]

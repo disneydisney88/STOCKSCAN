@@ -9,6 +9,8 @@ from stockscan.io_utils import HKT
 
 # 港股持續交易時段（供訊號 B off_hours 旗用）
 SESSIONS = ((time(9, 30), time(12, 0)), (time(13, 0), time(16, 0)))
+# 訊號 B 掃描時段（P3：下午掃到 16:10 收埋尾水）
+SCAN_SESSIONS = ((time(9, 30), time(12, 0)), (time(13, 0), time(16, 10)))
 
 
 def trading_days(lb: LB, start: date, end: date) -> list[date]:
@@ -44,3 +46,12 @@ def in_continuous_session(now: datetime | None = None) -> bool:
         return False
     t = now.time()
     return any(lo <= t < hi for lo, hi in SESSIONS)
+
+
+def in_scan_session(now: datetime | None = None) -> bool:
+    """而家係咪訊號 B 應該掃描嘅時段（SCAN_SESSIONS：09:30–12:00、13:00–16:10）。"""
+    now = now or datetime.now(HKT)
+    if now.weekday() >= 5:
+        return False
+    t = now.time()
+    return any(lo <= t < hi for lo, hi in SCAN_SESSIONS)
