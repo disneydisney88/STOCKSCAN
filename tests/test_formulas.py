@@ -75,34 +75,49 @@ def test_calc_ratio():
     assert calc_ratio(100.0, None) is None
 
 
-# ── 訊號 B 級距同狀態機 ──
+# ── 訊號 B 級距同狀態機（P3：SURGE 20pt；VOLUME 10x 級）──
 
 @pytest.mark.parametrize("chg,expect", [
     (-5.0, 0), (0.0, 0), (19.99, 0), (20.0, 20), (39.99, 20),
     (40.0, 40), (59.9, 40), (60.0, 60), (120.5, 120),
 ])
-def test_level_of(chg, expect):
-    assert level_of(chg) == expect
+def test_level_of_surge(chg, expect):
+    assert level_of(chg, 20.0, 20.0) == expect
+
+
+@pytest.mark.parametrize("ratio,expect", [
+    (9.99, 0), (10.0, 10), (19.99, 10), (20.0, 20),
+    (80.0, 80), (186.17, 180), (-3.0, 0),
+])
+def test_level_of_volume(ratio, expect):
+    assert level_of(ratio, 10.0, 10.0) == expect
 
 
 def test_decide_first_alert():
-    fire, frm, to = decide_alert(None, 25.0)
+    fire, frm, to = decide_alert(None, 25.0, 20.0, 20.0)
     assert fire and frm == 0 and to == 20
 
 
 def test_decide_below_first_no_alert():
-    assert decide_alert(None, 19.99) == (False, 0, 0)
+    assert decide_alert(None, 19.99, 20.0, 20.0) == (False, 0, 0)
 
 
 def test_decide_same_level_no_repeat():
     rec = {"level": 20, "count": 1, "last_alert": "10:00:00"}
-    assert decide_alert(rec, 35.0) == (False, 0, 0)  # 仲未過下一級
+    assert decide_alert(rec, 35.0, 20.0, 20.0) == (False, 0, 0)  # 仲未過下一級
 
 
 def test_decide_next_level_fires():
     rec = {"level": 20, "count": 1, "last_alert": "10:00:00"}
-    fire, frm, to = decide_alert(rec, 41.0)
+    fire, frm, to = decide_alert(rec, 41.0, 20.0, 20.0)
     assert fire and frm == 20 and to == 40
+
+
+def test_decide_volume_types_independent():
+    """同一隻股 SURGE／VOLUME 各自計級——rec 分開儲。"""
+    rec_v = {"level": 10, "count": 1, "last_alert": "10:00:00"}
+    assert decide_alert(rec_v, 12.0, 10.0, 10.0) == (False, 0, 0)
+    assert decide_alert(rec_v, 21.0, 10.0, 10.0)[0] is True
 
 
 # ── 中文數字（種子檔市值欄）──
@@ -161,3 +176,65 @@ def test_state_roundtrip(tmp_path, monkeypatch):
     assert iou.load_state(d) == {}
     iou.save_state(d, {"700.HK": {"level": 20, "count": 1, "last_alert": "10:00:00"}})
     assert iou.load_state(d)["700.HK"]["level"] == 20
+
+
+# ── P1 快取：UTC→HKT 日期回歸測試（09-04 全空榜慘案疫苗）──
+
+def test_cache_date_uses_hkt_not_utc(tmp_path, monkeypatch):
+    """官方文檔：API timestamp 係 UTC。日 K timestamp 係 HKT 零晨（= UTC 前一日 16:00），
+    merge_save 必須轉 HKT 先取日期，否則全快取日期早一日。"""
+    from datetime import datetime, timezone
+    from types import SimpleNamespace
+
+    import stockscan.kline_cache as kc
+
+    monkeypatch.setattr(kc, "CACHE_DIR", tmp_path)
+    monkeypatch.setattr(kc, "_MEMO", {})
+    bars = [
+        SimpleNamespace(
+            timestamp=datetime(2026, 9, 3, 16, 0, tzinfo=timezone.utc),  # = HKT 09-04 00:00
+            open=1, high=1, low=1, close=1, volume=1, turnover=1.0),
+        SimpleNamespace(
+            timestamp=datetime(2026, 9, 6, 16, 0, tzinfo=timezone.utc),  # = HKT 09-07 00:00
+            open=2, high=2, low=2, close=2, volume=2, turnover=2.0),
+    ]
+    df = kc.merge_save("99999", bars)
+    assert list(df["date"]) == ["2026-09-04", "2026-09-07"]
+
+
+def test_cache_window_upto_and_memo(tmp_path, monkeypatch):
+    from datetime import datetime, timezone
+    from types import SimpleNamespace
+    from datetime import date as _date
+
+    import stockscan.kline_cache as kc
+
+    monkeypatch.setattr(kc, "CACHE_DIR", tmp_path)
+    monkeypatch.setattr(kc, "_MEMO", {})
+    bars = [
+        SimpleNamespace(timestamp=datetime(2026, 9, 2, 16, tzinfo=timezone.utc),
+                        open=1, high=1, low=1, close=1, volume=1, turnover=100.0),
+        SimpleNamespace(timestamp=datetime(2026, 9, 3, 16, tzinfo=timezone.utc),
+                        open=1, high=1, low=1, close=1, volume=1, turnover=200.0),
+        SimpleNamespace(timestamp=datetime(2026, 9, 6, 16, tzinfo=timezone.utc),
+                        open=1, high=1, low=1, close=1, volume=1, turnover=300.0),
+    ]
+    kc.merge_save("99998", bars)
+    df = kc.load("99998")
+    assert df is not None and kc.load("99998") is df  # memo 命中
+    win = kc.window_upto(df, _date(2026, 9, 4), 11)
+    assert list(win["date"]) == ["2026-09-03", "2026-09-04"]
+    assert list(kc.window_upto(df, _date(2026, 9, 4), 1)["date"]) == ["2026-09-04"]
+
+
+def test_rtss_compare_matches_fixture():
+    """09-04 對照：命中 15/15（2026-09-08 凌晨實測結果，回歸保護）。"""
+    import json
+
+    cmp_path = ROOT / "data" / "eod" / "compare_rtss_20260904.json"
+    if not cmp_path.exists():
+        import pytest
+        pytest.skip("compare JSON 未生成")
+    res = json.loads(cmp_path.read_text(encoding="utf-8"))
+    assert res["hit_count"] == 15
+    assert res["missing"] == [] and res["extra"] == []

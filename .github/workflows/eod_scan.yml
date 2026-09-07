@@ -36,7 +36,9 @@ jobs:
           LONGPORT_APP_KEY: ${{ secrets.LONGPORT_APP_KEY }}
           LONGPORT_APP_SECRET: ${{ secrets.LONGPORT_APP_SECRET }}
           LONGPORT_ACCESS_TOKEN: ${{ secrets.LONGPORT_ACCESS_TOKEN }}
-        run: python scripts/run_eod.py
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python scripts/run_eod.py --notify
 
       - name: Commit radar CSV
         run: |

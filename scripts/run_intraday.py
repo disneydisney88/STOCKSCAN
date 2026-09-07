@@ -18,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from config import INTRA_POLL_SEC, DISCLAIMER
 from stockscan.calendar_hk import in_scan_session
+from stockscan.io_utils import today_hkt
 from stockscan.lb_client import LB, MissingCredentialsError
 from stockscan.scan_intraday import scan_once
 
@@ -51,7 +52,7 @@ def main() -> int:
             _sleep(INTRA_POLL_SEC)
             continue
         try:
-            alerts, near, meta = scan_once(lb, date.today())
+            alerts, near, meta = scan_once(lb, today_hkt())
         except MissingCredentialsError as e:
             print(f"[run_intraday] {e}", file=sys.stderr)
             return 2

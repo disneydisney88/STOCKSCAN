@@ -21,6 +21,7 @@ from stockscan.io_utils import HKT, lb_to_code5, log_error
 
 _CACHE_COLUMNS = ["date", "open", "high", "low", "close", "volume", "turnover"]
 _lock = threading.Lock()
+_MEMO: dict[str, pd.DataFrame] = {}  # code5 → df（Drive FS 讀細檔慢，每 process 只讀一次）
 
 
 def cache_path(code5: str) -> Path:
@@ -28,15 +29,20 @@ def cache_path(code5: str) -> Path:
 
 
 def load(code5: str) -> pd.DataFrame | None:
+    if code5 in _MEMO:
+        return _MEMO[code5]
     p = cache_path(code5)
     if not p.exists():
         return None
     try:
         df = pd.read_csv(p, dtype={"date": str})
-        return df if len(df) else None
+        df = df if len(df) else None
     except Exception as e:  # noqa: BLE001——快取檔壞咗就當冇，重新拉
         log_error("cache.load", f"{code5}: {e!r}")
-        return None
+        df = None
+    if df is not None:
+        _MEMO[code5] = df
+    return df
 
 
 def merge_save(code5: str, rows: list) -> pd.DataFrame:
@@ -61,6 +67,7 @@ def merge_save(code5: str, rows: list) -> pd.DataFrame:
         p = cache_path(code5)
         p.parent.mkdir(parents=True, exist_ok=True)
         df.to_csv(p, index=False)
+        _MEMO[code5] = df
     return df
 
 

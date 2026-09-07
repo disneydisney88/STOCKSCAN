@@ -22,6 +22,8 @@ def main() -> int:
     ap.add_argument("--codes", help="只掃呢啲代號（5 位，逗號分開），debug 用")
     ap.add_argument("--workers", type=int, default=2, help="快取拉數線程數（預設 2）")
     ap.add_argument("--cache-only", action="store_true", help="零 API，純快取計算")
+    ap.add_argument("--notify", action="store_true", help="推 Telegram（憑證喺 .env）")
+    ap.add_argument("--dry-run", action="store_true", help="印出 Telegram 訊息唔發送")
     args = ap.parse_args()
 
     date_arg = _date.fromisoformat(args.date) if args.date else None
@@ -38,6 +40,10 @@ def main() -> int:
     else:
         cols = ["code5", "name", "close", "chg_pct", "turnover_day", "mcap_total", "ratio"]
         print(df[cols].to_string(index=False))
+    if (args.notify or args.dry_run) and not df.empty:
+        from stockscan.notify import send_eod_table
+
+        send_eod_table(df, _date.fromisoformat(meta["scan_date"]), dry_run=args.dry_run)
     return 0
 
 

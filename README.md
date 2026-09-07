@@ -20,20 +20,41 @@ cp .env.example .env        # 填入三個 LONGPORT_ 變數（open.longbridge.co
 
 ```bash
 python -m stockscan.universe              # 建宇宙 data/universe.csv（一次性，之後 Actions 會補）
-python scripts/run_eod.py                 # 訊號 A：今日
+python scripts/run_eod.py                 # 訊號 A：今日（首次會拉 40 支日 K 入快取）
 python scripts/run_eod.py --date 2026-09-04   # 訊號 A：過去日子＋自動對照 RTSS
-python scripts/run_intraday.py            # 訊號 B：掃一次
-python scripts/run_intraday.py --loop 60  # 訊號 B：每 60 秒循環（本機用）
+python scripts/run_eod.py --codes 1393,8483   # 只掃某幾隻（debug）
+python scripts/run_eod.py --notify --dry-run  # 印 Telegram 訊息唔發送
+python scripts/run_intraday.py --once     # 訊號 B：掃一次
+python scripts/run_intraday.py --loop 60  # 訊號 B：交易日 09:30–12:00／13:00–16:10 HKT 每 60 秒循環
+python scripts/backfill_eod.py --start 2026-08-10 --end 2026-09-07  # 回填＋面板（零 API）
+python scripts/compare_rtss.py --all      # 對照所有 RTSS fixture
 python scripts/probe_ratelimit.py         # 實測 API 限額（結果寫 logs/）
 streamlit run streamlit_app.py            # 網頁版
 pytest -q                                 # 測試
 ```
 
+## 即市監察點開（常駐）
+
+- 手動（推薦先試）：`python scripts/run_intraday.py --loop 60`，交易日 09:30–12:00／13:00–16:10
+  HKT 自動掃，午休／收市自動瞓，Ctrl-C 隨時走（狀態已落盤）。
+- Windows 開機自動：`scripts/schedule_intraday.ps1`（登記 09:25 每日啟動；**要你自己行一次**，
+  檔內有寫登記同移除命令）。
+
+## Telegram 點設定（3 分鐘）
+
+1. Telegram 搵 **@BotFather** → `/newbot` → 攞 token
+2. 開私人 group／channel，加 bot 做 admin
+3. 向 bot 發一句嘢，開 `https://api.telegram.org/bot<token>/getUpdates` 抄 `chat.id`
+4. 兩個值加去 `C:\Users\<你>\.stockscan\.env`：`TELEGRAM_BOT_TOKEN=…`、`TELEGRAM_CHAT_ID=…`
+5. 試：`python scripts/run_eod.py --date 2026-09-07 --notify --dry-run`（唔發），
+   無問題就 `--notify`（真發）。GitHub Actions 想發就喺 repo Secrets 加同一對變數。
+
 ## 點改門檻
 
-全部喺 [`config.py`](config.py)：`MCAP_CAP_EOD`（10 億）、`MCAP_CAP_INTRA`（3 億）、
-`TURNOVER_MIN`（50 萬）、`MA_DAYS`（10）、`RATIO_MIN`（10×）、`INTRA_STEP_PCT`（20pt）、
-`QUOTE_BATCH`（500，probe 後可調）。改完喺 `HANDOVER.md` 記低原因。
+全部喺 [`config.py`](config.py)：`MCAP_CAP_EOD`（10 億）、`MCAP_CAP_INTRA`（10 億，P3 放寬）、
+`TURNOVER_MIN`（50 萬）、`MA_DAYS`（10）、`RATIO_MIN`（10×）、`INTRA_FIRST_PCT`／`INTRA_STEP_PCT`
+（20pt）、`INTRA_VOL_FIRST`／`INTRA_VOL_STEP`（10x）、`INTRA_POLL_SEC`（60）、
+`QUOTE_BATCH`（500）、`CANDLE_WORKERS`（2）。改完喺 `HANDOVER.md` 記低原因。
 
 ## 數據口徑
 
@@ -45,13 +66,18 @@ pytest -q                                 # 測試
 - **前 10 日均值**：日 K 取 11 支、剔最後一支（今日）後平均；不足 10 支照計，
   `ma10_days_available` 記實際支數、`ma_short=1`。
 - 種子檔「市值」欄只作首日對照，唔用嚟篩。
+- **快取**（P1）：`data/cache/daily/{code5}.csv`（不入 git，Drive 同步）。官方 API 所有
+  timestamp 係 UTC——日 K 日期必須轉 HKT 先取（`kline_cache.merge_save` 已處理，
+  有回歸測試看門）。歷史K線端點有 100 標的／期硬配額（301607），大規模拉數用即市
+  K 線端點（收市後回傳最近 N 支已確認日 K）。
 
 ## 自動化
 
-- GitHub Actions：`.github/workflows/eod_scan.yml`，交易日 HKT 16:35 自動跑訊號 A 並 commit CSV
-  （需喺 repo Secrets 設三個 `LONGPORT_` 變數）。
+- GitHub Actions：`.github/workflows/eod_scan.yml`，交易日 HKT 16:35 自動跑訊號 A
+  （`--notify`）並 commit CSV（repo Secrets：三個 Longbridge 變數＋兩個 TELEGRAM_ 變數，
+  唔設 TELEGRAM_ 就只掃唔推）。
 - Streamlit Community Cloud：連 `main` branch、main file = `streamlit_app.py`；
-  Secrets 同上三個變數（TOML 格式）。
+  Secrets 填三個 Longbridge 變數（`LONGBRIDGE_*` 或 `LONGPORT_*` 前綴都得）。
 
 ## 接手
 
