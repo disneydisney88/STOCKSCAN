@@ -1,136 +1,154 @@
-# STOCKSCAN HANDOVER
+# STOCKSCAN HANDOVER（交俾下一手：Claude / Codex / KL）
 
-更新時間（HKT）：2026-09-08 02:05
-執行者：zcode　交接對象：下一位（Codex / Claude / KL）
-工作夾（單一真相來源）：`G:\我的雲端硬碟\STOCKSCAN`（= Google Drive 同步，全部交收就喺呢度）
-Repo：https://github.com/disneydisney88/STOCKSCAN（branch `main`）
-Streamlit：https://stockscan-emwmwndwrop2emavfyatme.streamlit.app（四個 tab）
+更新時間（HKT）：2026-09-08 08:30
+執行者：zcode（第一、二階段）　交接對象：Claude（第三階段）／KL
+工作夾＝單一真相來源＝交收位：**`G:\我的雲端硬碟\STOCKSCAN`**（Google Drive 同步）
+Repo：https://github.com/disneydisney88/STOCKSCAN（`main`，全部已 push）
+Streamlit：https://stockscan-emwmwndwrop2emavfyatme.streamlit.app（四 tab）
+本機環境：Python 3.13（Windows Store 版）、套件 `longbridge==4.5.0`、Git Bash shell
 
 > 本工具只供學術研究及風險分析，不構成投資建議。
 
-## 1. 而家去到邊（第一階段 H0–H6 ＋ 第二階段 P1–P6）
+---
 
-| Checkpoint | 狀態 | 備註 |
+## 0. 一分鐘睇晒（TL;DR）
+
+- 兩個訊號都**已經生產級**：訊號 A 對 RTSS 09-04 **命中 15/15、零多零漏**（種子宇宙同 2,858 全宇宙都一樣）；訊號 B SURGE+VOLUME 實測正常。
+- 宇宙已轉用 `universe_full_20260907.csv`（**2,868 隻，掃描 2,858**）。
+- 20 日回填面板已做（`data/eod/radar_eod_panel.csv`，278 行）。
+- 快取架構行緊：`data/cache/daily/{code5}.csv`（2,854 檔 × 40 支日 K）。
+- **未做**：Actions 未試跑（等 KL 撳一次 Run workflow）、Streamlit tab2 未試（等 Cloud Secrets）、Telegram 真發（KL 話擺低）、第三階段（等 `data/raw/`）。
+- **三大陷阱**（新代碼必讀 §5）：① API timestamp 係 UTC（會早一日）② 歷史K線端點 100 標的硬配額 ③ `.env` 唔准入 repo／Drive。
+
+---
+
+## 1. PATH 對照表（全部絕對路徑）
+
+| 嘢 | 路徑 |
+|---|---|
+| 工作夾（repo root） | `G:\我的雲端硬碟\STOCKSCAN` |
+| 入口：訊號 A | `G:\我的雲端硬碟\STOCKSCAN\scripts\run_eod.py` |
+| 入口：訊號 B | `G:\我的雲端硬碟\STOCKSCAN\scripts\run_intraday.py` |
+| 入口：回填面板 | `G:\我的雲端硬碟\STOCKSCAN\scripts\backfill_eod.py` |
+| 入口：RTSS 對照 | `G:\我的雲端硬碟\STOCKSCAN\scripts\compare_rtss.py` |
+| 入口：API 限額實測 | `G:\我的雲端硬碟\STOCKSCAN\scripts\probe_ratelimit.py` |
+| 排程範例（未註冊） | `G:\我的雲端硬碟\STOCKSCAN\scripts\schedule_intraday.ps1` |
+| 核心套件 | `G:\我的雲端硬碟\STOCKSCAN\stockscan\`（lb_client / universe / scan_eod / scan_intraday / kline_cache / calendar_hk / notify / io_utils） |
+| 所有門檻 | `G:\我的雲端硬碟\STOCKSCAN\config.py`（唯一改參數嘅地方） |
+| **本機憑證** | `C:\Users\klcho\.stockscan\.env`（LONGBRIDGE_APP_KEY／APP_SECRET／ACCESS_TOKEN） |
+| KL 原始金鑰檔 | `G:\我的雲端硬碟\STOCKSCAN\LONGBRIDGE_APP.ENV`（已 .gitignore，**唔准 commit**） |
+| 宇宙 | `data/universe.csv`（生成物，2,868 行）；種子 `data/universe_seed_20260831.csv`；全宇宙 `data/universe_full_20260907.csv` |
+| 日線快取 | `data/cache/daily/{code5}.csv`（date,open,high,low,close,volume,turnover；**唔入 git**） |
+| EOD 產出 | `data/eod/radar_eod_YYYYMMDD.csv`＋`radar_eod_panel.csv`＋`compare_rtss_20260904.json` |
+| 即市產出 | `data/intraday/alerts_YYYYMMDD.csv`；狀態 `state/intraday_state_YYYYMMDD.json` |
+| Log | `logs/`（errors_*.log、run_stats.csv、intraday_stats.csv、probe_*.json；gitignore） |
+| RTSS fixture | `tests/fixtures/rtss_20260904.csv`（15 隻） |
+| 測試 | `tests/test_formulas.py`（49 項，`pytest -q` 全綠） |
+| Actions | `.github/workflows/eod_scan.yml`（cron 35 8 * * 1-5 UTC＝HKT 16:35＋workflow_dispatch；`--notify`） |
+| 第三階段規格 | `G:\我的雲端硬碟\STOCKSCAN\claude_STOCKSCAN_zcode任務規格書_第三階段_歷史數據入庫_20260908.md` |
+| 原始檔落點（第三階段） | `data/raw/`（KL 未放） |
+
+---
+
+## 2. 而家去到邊（第一階段 H0–H6＋第二階段 P1–P6 全部 ✅）
+
+| 模組 | 狀態 | 實測數字 |
 |---|---|---|
-| H0 地基 | ✅ | config／lb_client（longbridge SDK 4.5.0）／probe；首次 push 完成 |
-| H1 宇宙 | ✅ | **09-08 朝早已轉用 `universe_full_20260907.csv`：總數 2,868、掃描宇宙 2,858（剔 10 隻 REIT）、static 成功率 2,857/2,858**；`3408.HK`（GX KOSPI 200 槓桿產品）無 static_info 屬正常，記 `static_missing=1` 照保留唔 drop |
-| H2 收市榜 | ✅ | **09-04 對照 RTSS 命中 15/15（100%），零多零漏**；09-07 命中 11 |
-| H3 即市 | ✅ | SURGE＋VOLUME 雙觸發實測 21 條 alert（off_hours=1）；VOLUME 嗰 11 隻同 A 榜完全重疊 |
-| H4 Streamlit | ✅ | KL 自己部署咗（stockscan-emwmwndwrop2emavfyatme）；本地加埋 tab4 |
-| H5 部署 | ✅(半) | Actions workflow 已上（加咗 --notify）；GitHub Secrets 未貼 → 未試手動觸發 |
-| H6 測試交接 | ✅ | pytest **49 項全綠**；README／HANDOVER 齊 |
-| P1 EOD 提速 | ✅ | 日線快取 `data/cache/daily/{code5}.csv`（1,557 檔 × 40 支）；重跑 09-07 全程 **3 分鐘內**（實際 cached 日子秒級）；`--codes`／`--workers`／`--cache-only`／run_stats 全有 |
-| P2 面板 | ✅ | 21 個交易日（08-10→09-07）逐日 CSV＋`radar_eod_panel.csv` 266 行；摘要見 §9 |
-| P3 訊號B | ✅ | 門檻放寬 10 億；SURGE/VOLUME 各自第 N 次；掃描時段 09:30–12:00／13:00–16:10；`schedule_intraday.ps1` 只寫檔未註冊 |
-| P4 Telegram | ⏸ 擺低 | 代碼齊（notify.py＋`--notify`／`--dry-run`＋workflow），dry-run 格式已驗；**KL 話唔搞住**——之後想搞就 README「Telegram 點設定」3 分鐘搞掂 |
-| P5 Streamlit | ✅ | 四 tab：A 榜／B 即市（本機掃一次＋唯讀 alerts）／RTSS 對照／歷史面板（每日命中圖＋上榜王＋逐股翻查）；每個 tab 有「數據截至」 |
-| P6 交接 | ✅ | 本檔＋README；push 完成（commit 見 git log） |
+| H0 地基 | ✅ | longbridge SDK 4.5.0；`.cn` 接入點（呢部機快 4 倍） |
+| H1 宇宙 | ✅ | **2,868 總數／2,858 掃描（剔 10 REIT）／static 2,857 成功**；`3408.HK` 無 static（槓桿產品，正常），`static_missing=1` 照保留 |
+| H2 訊號 A | ✅ | **09-04 vs RTSS：15/15，extra=[]，missing=[]**（種子宇宙同 full 宇宙都一樣）；09-07 命中 11 |
+| H3 訊號 B | ✅ | SURGE+VOLUME 雙觸發；10 億門檻；實測 21 條 alert（off_hours=1）；VOLUME 嗰 11 隻同 A 榜完全重疊 |
+| H4/H5 部署 | ✅/⚠ | Streamlit 四 tab 已部署（KL 搞掂）；**Actions 未試跑**（workflow 已備好，雙 Secret 名兼容） |
+| H6 測試 | ✅ | pytest 49 綠 |
+| P1 快取 | ✅ | 40 支窗；重跑 09-07 全程 <2 分鐘；`--codes`／`--workers`／`--cache-only`／run_stats |
+| P2 面板 | ✅ | 21 交易日（08-10→09-07），**278 行**；每日命中中位 13／min 6／max 23；上榜王 06182 乙德 4 次；市值<3 億佔 51.8% |
+| P3 訊號 B 升級 | ✅ | 見 H3；`schedule_intraday.ps1` 只寫檔未註冊 |
+| P4 Telegram | ⏸ 擺低 | 代碼齊＋dry-run 已驗；真發等 KL（3 分鐘教學喺 README） |
+| P5 Streamlit | ✅ | 四 tab＋「數據截至」時間戳；tab2 本機掃一次／Cloud 唯讀 alerts |
+| P6 交接 | ✅ | 本檔 |
 
-## 2. 實測限額（probe＋兩晚實戰）
+## 3. TO DO（跟優先；「未 DO」詳細理由喺 §4）
 
-- quote 每批 500 無問題（probe 實測 500 級別全過；QUOTA 無事）；**quote 延遲 warmup 後 ~3ms/隻**。
-- 即市K線端點（`ctx.candlesticks`）：1,557 隻 × 40 支一次過拉晒，2 線程 6.6 分鐘，0 限流。
-- **歷史K線端點（history_candlesticks_*）：硬配額 100 隻標的／期**（error 301607
-  `requested:100/limit:100`）。第一晚 4 線程拉 09-04 嗰輪燒晒 100 個名額後全面跪。
-  **教訓：大規模拉數用即市K線端點（收市後回最近 N 支已確認日 K），歷史端點慳住用。**
-- 全宇宙一輪 quote（訊號 B）：~10 秒。
-- 301607 出現時 `scan_eod.ensure_cache` 會早退用現有快取頂住，唔會燒 retry。
+1. **KL 撳一次 Actions**：GitHub repo → Actions → `eod_scan` → Run workflow（main）。
+   會：2,858 隻全掃（首次幫新符號拉 ~130 支快取，約 10–15 分鐘）→ 寫 `radar_eod_20260908.csv` → commit 返嚟。
+   ⚠ Actions runner 喺美國，SDK 自動會行 `.com` 接入點，正常。
+2. **KL 貼 Streamlit Secrets**（App → Settings → Secrets，TOML，值抄 `LONGBRIDGE_APP.ENV`）→ tab2「即掃一次」。
+   第一次掃會即場拉快取，**7–10 分鐘冇反應係正常**（Cloud 免費版唔好催）。
+3. **第三階段**（等 KL 放 `data/raw/`，10 個事件 CSV＋7 個券商射倉 xlsx＋3 個 L 型研究＋Codex P0 價格庫＋RTSS 522 alert）→ 跟第三階段規格書 M1→M7 順序做。
+4. 觀察 3–5 個交易日：A 榜 vs RTSS 逐日對數（`scripts/compare_rtss.py --all`，有新 fixture 就加落 `tests/fixtures/`）。
+5. 之後先諗：Render 長開 worker、Turso、門檻微調。
 
-## 3. 數據口徑決定（同 config.py 一致）
+## 4. 未 DO（做唔到／未做嘅，同埋點解）
 
-- 時區一律 HKT。**⚠ 官方 API 所有 timestamp 係 UTC**——日 K timestamp 係 HKT 零晨，
-  直接 `.date()` 會早一日（第一晚 0/15 全空榜根因）。`kline_cache.merge_save` 已轉 HKT，
-  有回歸測試。**任何新代碼掂 timestamp 都要記住呢條。**
-- `mcap_total = close × total_shares`（static_info）；篩選用 mcap_total；`mcap_hk` 另出。
-- 訊號 A 成交額＝日 K `turnover`；訊號 B＝`quote.turnover`（即市累計）。
-- 前 10 日均值：快取取 scan 日前 10 支；不足 10 支照計（`ma10_days_available`＋`ma_short=1`）。
-- `turnover_to_mcap` 以百分比輸出。
-- 代號：種子 `00623.hk` → `623.HK`；輸出 `code5=00623`。`02667.hk_depre`／`03301.hk_depre` 剔除。
-- 除牌交叉：`universe_full_20260907.csv` 仍未放；暫用 config 硬編 5 隻。
-- 訊號 B 預篩 `min(prev_close, last_done) × total_shares < 10 億`；最終篩 `mcap_now < 10 億`。
-- 快取 `data/cache/daily/` **唔入 git**（1,557 細檔，Drive 已同步；Actions 每日全量重拉即市窗無損失）。
-- `.env` 正印位置 `%USERPROFILE%\.stockscan\.env`（P0 安全：唔好俾 Drive 同步上雲）；
-  讀取次序 st.secrets → repo .env（如存在）→ user profile → 環境變數；
-  `LONGBRIDGE_*`／`LONGPORT_*` 兩個前綴都認。repo 內真 .env 已刪。
+| 未做 | 點解 | 開工條件 |
+|---|---|---|
+| Actions 實跑 | 我無 GitHub API token 觸發 workflow_dispatch（KL 禁咗用 git credential；`gh` 未登入） | KL 撳一次 Run workflow 就完 |
+| Streamlit tab2 實試 | 等 Cloud Secrets | KL 貼三個值 |
+| Telegram 真發 | KL 明言「唔搞住」 | KL 俾 token（README 教學） |
+| 第三階段 M1–M7 | KL 指示等 `data/raw/` 放好先開 | KL 放檔＋話開工 |
+| `universe_full` 之後嘅 `has_domestic_shares` | full 檔冇「內資股(佔比)」欄，轉 full 後個旗全 0 | 想保留：拿 `in_seed_20260831=1` join 返種子檔個旗（細工程） |
+| 停牌股重複拉數 | 尾支舊過 scan_date 嘅股每次 run 都會重拉（~130 隻，2 分鐘），因為佢哋永遠冇當日 bar | 可以喺 ensure_cache 加「重拉過一次都仲舊就跳過」邏輯（非必要） |
+| 動態市值宇宙 | 規格 §8：每日用即市價 × total_shares 重算邊啲入 10 億／3 億 | 現行做法已經係「static total_shares × 即市價」，效果等價；真正嘅「每日重算宇宙成員」係第三階段後嘅嘢 |
 
-## 4. 對照 RTSS 09-04 結果
+## 5. 留意（陷阱——新代碼前必讀，全部實測中過伏）
 
-- **命中 15/15（100%）；多 0；漏 0。** 詳情 `data/eod/compare_rtss_20260904.json`。
-- 手動核對樣本：01393 恒鼎實業——收市 0.028、成交 5.55M、ma10=197,320 → **28.1x**，
-  同 RTSS 圖完全一致（呢個數確認埋「前 10 日均值唔含今日」嘅口徑係啱）。
-- 邊緣個案都有：01094 承輝國際 -11.76% 跌住爆量 29.7x、00201 華大酒店 -6.06%——RTSS 榜唔篩升跌，
-  我哋口徑一樣。
-- 規格書 H2 門檻「命中 ≥10/15」：**超額完成**。
-- P1 驗收「重跑結果同未快取版本逐行相同」：09-04 由快取重算仍係 15 隻同一批 ✓。
+1. **UTC 時間戳**：官方文檔明寫所有 API timestamp 係 UTC。日 K timestamp 係 HKT 零晨，
+   直接 `.date()` 會**早一日**——第一晚 09-04 全空榜（0/15）就係咁嚟。
+   `kline_cache.merge_save` 已 `.astimezone(HKT)`，有回歸測試。任何掂 timestamp 嘅新代碼都要轉 HKT。
+2. **歷史K線配額**：`history_candlesticks_*` 有 **100 標的／期** 硬配額（error 301607
+   `requested:100/limit:100`）。大規模拉數一律用**即市K線端點** `ctx.candlesticks(symbol, count)`
+   （獨立配額，收市後回最近 N 支已確認日 K）。`scan_eod.ensure_cache` 見 301607 會早退用快取頂住。
+3. **NaN total_shares**：`3408.HK` 呢類冇 static_info 嘅，`total_shares=NaN`——
+   `not NaN` 係 False，`if not ts_total` 擋唔住，`round(NaN)` 會炸。`scan_eod`／`scan_intraday`
+   都已補 `pd.isna` guard；新代碼記住呢個 pattern。
+4. **憑證規矩**：唔准 cat／print／commit 任何 token。repo 內唔准有 `.env`（正印位置
+   `%USERPROFILE%\.stockscan\.env`）。`LONGBRIDGE_APP.ENV` 同 `*.env` 已 gitignore。
+   Log 入面都唔准有 token。
+5. **憑證讀取次序**：st.secrets → repo `.env`（如存在）→ `%USERPROFILE%\.stockscan\.env` →
+   環境變數。`LONGBRIDGE_*`／`LONGPORT_*` 兩個前綴都認（GitHub Secrets 兩個名都兼容，workflow 已寫 `||` fallback）。
+6. **時區**：所有「今日」用 HKT（`stockscan.io_utils.today_hkt()`），唔好用機器本地時間
+   （呢部機係 GMT，曾經搞到 alert 寫錯日子）。
+7. **Drive 同步注意**：工作夾喺 Drive 入面——(a) 大量細檔讀寫慢，`kline_cache` 有 in-memory
+   memo（每 process 讀一次）；(b) `.git` 由 Drive 同步有少量風險，如果 git 壞咗，reclone 就返生（所有嘢都推咗上去）；(c) 唔好喺兩部機同時開住個 repo 做 git 操作。
+8. **SDK**：用 `longbridge`（4.5.0），唔好用舊 `longport` 包（預設端點已死）。
+   4.x API：`Config.from_apikey(...)`（冇 `from_env`）；批量 quote/static 上限 500。
+9. **門檻只准改 `config.py`**，改完寫 HANDOVER。對照失手唔准夾數——先記錄差異再查口徑。
+10. **呢单機嘅時鐘係 GMT**；「今日」錯一日就會寫錯檔名——一律 `today_hkt()`。
 
-## 5. 已知 bug / 未完成
-
-- GitHub Actions 未實跑過（等 KL 貼 Secrets：三個 Longbridge＋兩個 TELEGRAM_，唔設 TELEGRAM_ 會照跑只係唔推）。
-- Streamlit Cloud tab2「掃一次」未試（要 Cloud Secrets；無快取時會即場拉 40 支日 K，慢過本機）。
-- Telegram 真發未試（等 KL 放 `TELEGRAM_BOT_TOKEN`／`TELEGRAM_CHAT_ID` 入 `%USERPROFILE%\.stockscan\.env`）。
-- ~~`universe_full_20260907.csv` 仍未放~~（**已放已入庫**）；除牌交叉已自動轉用 code5。
-- 快取 memo（in-memory）process 內不過期——長開 loop 每日第一次跑前重啟 process 就新鮮。
-- 回填面後市值用今日 static_info 股數近似；期內有合股／拆股／大配股嘅股未標 `mcap_unreliable`（第三階段 M3 處理）。
-
-## 6. 下手要做（按優先）
-
-1. **KL**：GitHub repo Secrets 貼三個 Longbridge 變數 → Actions 手動 trigger 一次 `eod_scan` 驗證。
-2. **KL**：Streamlit Cloud App Secrets 貼三個 Longbridge 變數 → tab2 試「掃一次」。
-3. ~~Telegram~~（KL 話唔搞住；代碼留咗喺度，隨時 3 分鐘搞掂）。
-4. ~~universe_full~~（**已完成**：2,868 隻入庫）。留意：今晚 09-04／09-07 兩個 radar CSV 同 panel 係用**種子宇宙 1,557** 計嘅；由 09-08 起 Actions 每日會用 2,858 隻掃，首次會幫 ~1,300 隻新股拉快取（多 5–7 分鐘）。
-5. **第三階段（等 KL 放 `data/raw/` 先開）**：M1 事件庫 → M2 價格庫入快取 → M3 13 個月面板……規格書已喺 Drive 夾。
-6. 觀察幾日 A 榜同 RTSS 逐日對數，再決定門檻微調。
-7. Render 長開 worker（--loop 60）搬上雲，唔靠 PC 開機。
-8. 細位拋光：full 檔冇「內資股(佔比)」欄，轉 full 後 `has_domestic_shares` 全 0——想保留可以拿 `in_seed_20260831=1` 嘅股同種子檔 join 返個旗。
-
-## 7. 點樣本機重跑
+## 6. 點樣重跑（三行＋測試）
 
 ```bash
 cd "G:\我的雲端硬碟\STOCKSCAN"
-python scripts/run_eod.py                      # 今日（首次 ~7 分鐘拉快取，之後秒級）
-python scripts/run_eod.py --date 2026-09-04    # 對照 RTSS
-python scripts/run_intraday.py --loop 60       # 即市常駐（交易日 09:30-16:10 HKT）
-python scripts/backfill_eod.py --start 2026-08-10 --end 2026-09-07   # 回填面板
-pytest -q                                      # 49 tests
+python scripts/run_eod.py                      # 今日 EOD（首次 ~10 分鐘拉快取，之後秒級）
+python scripts/run_eod.py --date 2026-09-04    # 對照 RTSS（自動出 compare JSON）
+python scripts/run_intraday.py --loop 60       # 即市常駐（交易日 09:30–12:00／13:00–16:10 HKT）
+python scripts/backfill_eod.py --start 2026-08-10 --end 2026-09-07   # 回填＋面板
+pytest -q                                      # 49 tests 全綠
 ```
 
-（前提：`%USERPROFILE%\.stockscan\.env` 有三個 Longbridge 變數。）
+## 7. RTSS 09-04 對照（詳細）
 
-## 8. Secrets 放邊（只寫位置，唔寫值）
+- **15/15 命中、0 多、0 漏**（種子宇宙 1,557 同 full 宇宙 2,858 各跑一次，結果一樣）。
+- 手動核對：01393 恒鼎實業收市 0.028、成交 5.55M、前 10 日均 197,320 → **28.1x**，同 RTSS 一致
+  ——確認「前 10 個交易日均值唔含今日」口徑正確。
+- 邊緣個案照捕：01094 承輝國際 -11.76%（29.7x）、00201 華大酒店 -6.06%——RTSS 唔篩升跌，我哋都唔篩。
+- 門檻 ≥10/15：**超額完成**。
 
-- 本機正印：`C:\Users\klcho\.stockscan\.env`（唔喺 repo，唔會上 Drive）
-- Streamlit Cloud：App → Settings → Secrets（`LONGBRIDGE_*` 三個；TELEGRAM_ 兩個如要 tab2 推）
-- GitHub Actions：repo → Settings → Secrets → Actions（三個 Longbridge＋兩個 TELEGRAM_）
+## 8. 面板摘要（P2：08-10→09-07，21 個交易日，full 宇宙 278 行）
 
-## 9. 面板摘要（P2：2026-08-10 → 2026-09-07，21 個交易日，266 行）
+- 每日上榜：中位 **13**／最少 **6**／最多 **23**
+- 上榜王：06182 乙德投資控股 4 次；02048 易居企業控股／01792 CMON／00254 國家聯合資源 3 次
+- 市值 <3 億佔 **51.8%**
+- 檔：`data/eod/radar_eod_panel.csv`（多一欄 `scan_date`）
 
-- **每日上榜數**：中位 **12**／最少 **6**／最多 **21**
-- **上榜次數最多頭 10**：
-  1. 06182 乙德投資控股 4 次
-  2. 02048 易居企業控股 3 次
-  3. 01792 CMON 3 次
-  4. 00254 國家聯合資源 3 次
-  5. 08491 COOL LINK 2 次
-  6. 02113 世紀集團國際 2 次
-  7. 01265 天津津燃公用 2 次
-  8. 00210 達芙妮國際 2 次
-  9. 02536 百樂皇宮 2 次
-  10. 08620 亞洲速運 2 次
-- **市值 <3 億佔比**：52.3%
-- 檔案：`data/eod/radar_eod_panel.csv`（欄 `scan_date` ＋ 15 欄標準輸出）；逐日 CSV 同夾。
+## 9. Secrets 放邊（只寫位置）
 
-## 10. 今晚改動一覽（第二階段）
+- 本機：`C:\Users\klcho\.stockscan\.env` ✅（KL 已放，zcode 驗證過讀到）
+- GitHub Actions：repo Secrets ✅（KL 已放；`LONGPORT_*` 或 `LONGBRIDGE_*` 名都得）
+- Streamlit Cloud：App → Settings → Secrets ⏳（等 KL；TOML 格式見 kl 問過嗰個框）
 
-- `stockscan/kline_cache.py`（新）：日線快取＋HKT 日期修復＋memo＋40 支窗
-- `stockscan/scan_eod.py`：重寫做快取優先；`--cache-only`；301607 早退；run_stats
-- `stockscan/scan_intraday.py`：SURGE＋VOLUME；級距 `level_of(value, first, step)`；
-  狀態檔加 first_seen_price/turnover/ts
-- `stockscan/notify.py`（新）：Telegram 三件套；dry-run
-- `stockscan/lb_client.py`：憑證次序加 user profile；LONGBRIDGE_/LONGPORT_ 雙前綴
-- `scripts/`：backfill_eod.py（新）、compare_rtss.py（新）、schedule_intraday.ps1（新）、
-  run_eod/run_intraday 加參數
-- `streamlit_app.py`：四 tab
-- `.github/workflows/eod_scan.yml`：`--notify`＋TELEGRAM_ secrets
-- 測試 38 → **49**（級距／雙觸發／UTC→HKT 疫苗／memo／15/15 回歸）
+## 10. git 一覽（今晚五個 commit）
+
+`cd14aca` 骨架 → `564267a` polish → `a60b40e` SDK 轉 longbridge → `e7520c1` P1 快取＋P3 升級＋兩日 radar → `03e1434` P2 面板＋P4/P5/P6 → `a2d9617` workflow 雙 Secret 名 → 最新：NaN guard＋full 宇宙重掃＋本檔。
 
 *本規格書及所有產出只供學術研究及風險分析，不構成投資建議。*

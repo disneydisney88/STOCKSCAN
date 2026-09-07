@@ -172,14 +172,18 @@ def build_eod(lb, date_arg: date | None = None, cache_only: bool = False,
             continue
         tday = win.iloc[-1]
         prevs = win.iloc[:-1]
-        close = float(tday["close"])
-        prev_close = float(prevs["close"].iloc[-1]) if len(prevs) else None
-        turnover_day = float(tday["turnover"])
-        ma, n_avail = calc_ma([float(t) for t in prevs["turnover"]])
+        close = float(tday["close"]) if pd.notna(tday["close"]) else 0.0
+        prev_close = None
+        if len(prevs):
+            valid = prevs["close"].dropna()
+            prev_close = float(valid.iloc[-1]) if len(valid) else None
+        turnover_day = float(tday["turnover"]) if pd.notna(tday["turnover"]) else 0.0
+        ma, n_avail = calc_ma([float(t) for t in prevs["turnover"] if pd.notna(t)])
         ratio = calc_ratio(turnover_day, ma)
         ts_total = shares.get(sym)
-        if not close or not ts_total or ts_total <= 0 or ratio is None:
-            continue
+        if (ts_total is None or pd.isna(ts_total) or ts_total <= 0
+                or not close or not turnover_day or ratio is None):
+            continue  # NaN total_shares（static_missing）都會喺度擋埋
         chg = (close / prev_close - 1) * 100 if prev_close else None
         mcap_total = close * ts_total
         hk = hk_sh.get(sym)

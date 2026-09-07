@@ -109,8 +109,9 @@ def scan_once(lb, scan_date: date | None = None) -> tuple[pd.DataFrame, pd.DataF
         ts_total = shares.get(sym)
         prev = float(q.prev_close or 0)
         last = float(q.last_done or 0)
-        if not prev or not last or not ts_total or ts_total <= 0:
-            continue
+        if (prev <= 0 or last <= 0 or ts_total is None
+                or pd.isna(ts_total) or ts_total <= 0):
+            continue  # NaN total_shares（static_missing）都擋埋
         if min(prev, last) * ts_total >= MCAP_CAP_INTRA:
             continue  # 預篩：唔會走漏任何可能合資格嘅
         pool[sym] = {
