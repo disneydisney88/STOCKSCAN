@@ -13,7 +13,7 @@ Streamlit：https://stockscan-emwmwndwrop2emavfyatme.streamlit.app（四個 tab�
 | Checkpoint | 狀態 | 備註 |
 |---|---|---|
 | H0 地基 | ✅ | config／lb_client（longbridge SDK 4.5.0）／probe；首次 push 完成 |
-| H1 宇宙 | ✅ | 1,562 隻（剔 2 個 `_depre` 重複）；掃描宇宙 1,557；static 成功率 **100%**；內資股 21 隻 |
+| H1 宇宙 | ✅ | **09-08 朝早已轉用 `universe_full_20260907.csv`：總數 2,868、掃描宇宙 2,858（剔 10 隻 REIT）、static 成功率 2,857/2,858**；`3408.HK`（GX KOSPI 200 槓桿產品）無 static_info 屬正常，記 `static_missing=1` 照保留唔 drop |
 | H2 收市榜 | ✅ | **09-04 對照 RTSS 命中 15/15（100%），零多零漏**；09-07 命中 11 |
 | H3 即市 | ✅ | SURGE＋VOLUME 雙觸發實測 21 條 alert（off_hours=1）；VOLUME 嗰 11 隻同 A 榜完全重疊 |
 | H4 Streamlit | ✅ | KL 自己部署咗（stockscan-emwmwndwrop2emavfyatme）；本地加埋 tab4 |
@@ -22,7 +22,7 @@ Streamlit：https://stockscan-emwmwndwrop2emavfyatme.streamlit.app（四個 tab�
 | P1 EOD 提速 | ✅ | 日線快取 `data/cache/daily/{code5}.csv`（1,557 檔 × 40 支）；重跑 09-07 全程 **3 分鐘內**（實際 cached 日子秒級）；`--codes`／`--workers`／`--cache-only`／run_stats 全有 |
 | P2 面板 | ✅ | 21 個交易日（08-10→09-07）逐日 CSV＋`radar_eod_panel.csv` 266 行；摘要見 §9 |
 | P3 訊號B | ✅ | 門檻放寬 10 億；SURGE/VOLUME 各自第 N 次；掃描時段 09:30–12:00／13:00–16:10；`schedule_intraday.ps1` 只寫檔未註冊 |
-| P4 Telegram | ✅(半) | notify.py＋`--notify`／`--dry-run`＋workflow；dry-run 格式已驗；**真發等 KL 放 TELEGRAM_ 兩個變數** |
+| P4 Telegram | ⏸ 擺低 | 代碼齊（notify.py＋`--notify`／`--dry-run`＋workflow），dry-run 格式已驗；**KL 話唔搞住**——之後想搞就 README「Telegram 點設定」3 分鐘搞掂 |
 | P5 Streamlit | ✅ | 四 tab：A 榜／B 即市（本機掃一次＋唯讀 alerts）／RTSS 對照／歷史面板（每日命中圖＋上榜王＋逐股翻查）；每個 tab 有「數據截至」 |
 | P6 交接 | ✅ | 本檔＋README；push 完成（commit 見 git log） |
 
@@ -68,7 +68,7 @@ Streamlit：https://stockscan-emwmwndwrop2emavfyatme.streamlit.app（四個 tab�
 - GitHub Actions 未實跑過（等 KL 貼 Secrets：三個 Longbridge＋兩個 TELEGRAM_，唔設 TELEGRAM_ 會照跑只係唔推）。
 - Streamlit Cloud tab2「掃一次」未試（要 Cloud Secrets；無快取時會即場拉 40 支日 K，慢過本機）。
 - Telegram 真發未試（等 KL 放 `TELEGRAM_BOT_TOKEN`／`TELEGRAM_CHAT_ID` 入 `%USERPROFILE%\.stockscan\.env`）。
-- `universe_full_20260907.csv`（2,868 隻）仍未放 `data/`；除牌交叉暫用硬編 5 隻。
+- ~~`universe_full_20260907.csv` 仍未放~~（**已放已入庫**）；除牌交叉已自動轉用 code5。
 - 快取 memo（in-memory）process 內不過期——長開 loop 每日第一次跑前重啟 process 就新鮮。
 - 回填面後市值用今日 static_info 股數近似；期內有合股／拆股／大配股嘅股未標 `mcap_unreliable`（第三階段 M3 處理）。
 
@@ -76,11 +76,12 @@ Streamlit：https://stockscan-emwmwndwrop2emavfyatme.streamlit.app（四個 tab�
 
 1. **KL**：GitHub repo Secrets 貼三個 Longbridge 變數 → Actions 手動 trigger 一次 `eod_scan` 驗證。
 2. **KL**：Streamlit Cloud App Secrets 貼三個 Longbridge 變數 → tab2 試「掃一次」。
-3. **KL**：Telegram bot（README 有 3 分鐘教學）→ `--notify` 真發一次。
-4. **KL**：放 `data/universe_full_20260907.csv` → 重跑 `python -m stockscan.universe`（自動改 code5 交叉）。
+3. ~~Telegram~~（KL 話唔搞住；代碼留咗喺度，隨時 3 分鐘搞掂）。
+4. ~~universe_full~~（**已完成**：2,868 隻入庫）。留意：今晚 09-04／09-07 兩個 radar CSV 同 panel 係用**種子宇宙 1,557** 計嘅；由 09-08 起 Actions 每日會用 2,858 隻掃，首次會幫 ~1,300 隻新股拉快取（多 5–7 分鐘）。
 5. **第三階段（等 KL 放 `data/raw/` 先開）**：M1 事件庫 → M2 價格庫入快取 → M3 13 個月面板……規格書已喺 Drive 夾。
 6. 觀察幾日 A 榜同 RTSS 逐日對數，再決定門檻微調。
 7. Render 長開 worker（--loop 60）搬上雲，唔靠 PC 開機。
+8. 細位拋光：full 檔冇「內資股(佔比)」欄，轉 full 後 `has_domestic_shares` 全 0——想保留可以拿 `in_seed_20260831=1` 嘅股同種子檔 join 返個旗。
 
 ## 7. 點樣本機重跑
 
