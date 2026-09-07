@@ -15,6 +15,13 @@ from stockscan.io_utils import log_error
 
 REQUIRED_KEYS = ("LONGPORT_APP_KEY", "LONGPORT_APP_SECRET", "LONGPORT_ACCESS_TOKEN")
 
+# KL 嘅 .env 用 LONGBRIDGE_ 前綴——兩個前綴都認，SDK 只食 LONGPORT_*
+_KEY_ALIASES = {
+    "LONGPORT_APP_KEY": "LONGBRIDGE_APP_KEY",
+    "LONGPORT_APP_SECRET": "LONGBRIDGE_APP_SECRET",
+    "LONGPORT_ACCESS_TOKEN": "LONGBRIDGE_ACCESS_TOKEN",
+}
+
 T = TypeVar("T")
 
 
@@ -38,6 +45,10 @@ def ensure_credentials() -> None:
     from dotenv import load_dotenv
 
     load_dotenv()
+    # 3) LONGBRIDGE_ 前綴 alias → LONGPORT_（SDK 只認 LONGPORT_*）
+    for std, alias in _KEY_ALIASES.items():
+        if not os.environ.get(std) and os.environ.get(alias):
+            os.environ[std] = os.environ[alias]
 
 
 def get_config():
@@ -46,10 +57,10 @@ def get_config():
     if missing:
         raise MissingCredentialsError(
             f"缺 Longbridge 憑證：{missing}。"
-            "請喺 repo 根目錄建立 .env（照 .env.example 三個 LONGPORT_ 變數），"
+            "請喺 repo 根目錄建立 .env（LONGPORT_* 或 LONGBRIDGE_* 前綴都得，照 .env.example），"
             "或喺 Streamlit Cloud Secrets／GitHub Actions Secrets 設定。"
         )
-    from longport.openapi import Config
+    from longbridge.openapi import Config
 
     return Config.from_apikey(
         app_key=os.environ["LONGPORT_APP_KEY"],
@@ -71,7 +82,7 @@ class LB:
     @property
     def ctx(self):
         if self._ctx is None:
-            from longport.openapi import QuoteContext
+            from longbridge.openapi import QuoteContext
 
             self._ctx = QuoteContext(get_config())
         return self._ctx
@@ -114,7 +125,7 @@ class LB:
 
     def candles_today(self, symbol: str, n: int = 11) -> list:
         """日 K 最近 n 支（含今日即市 bar）——訊號 A「今日」跑法。"""
-        from longport.openapi import AdjustType, Period
+        from longbridge.openapi import AdjustType, Period
 
         return self._retry(
             f"candlesticks[{symbol}]",
@@ -123,7 +134,7 @@ class LB:
 
     def candles_by_date(self, symbol: str, end: date, n: int = 11) -> list:
         """取 end（含）之前最近 n 支日 K——訊號 A「過去日子」跑法。"""
-        from longport.openapi import AdjustType, Period
+        from longbridge.openapi import AdjustType, Period
 
         start = end - timedelta(days=60)
         rows = self._retry(
@@ -135,7 +146,7 @@ class LB:
         return list(rows[-n:])
 
     def trading_days(self, start: date, end: date) -> list[date]:
-        from longport.openapi import Market
+        from longbridge.openapi import Market
 
         res = self._retry(
             "trading_days",

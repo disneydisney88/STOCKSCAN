@@ -1,4 +1,4 @@
-longport==4.3.7
+longbridge==4.5.0
 streamlit>=1.40
 pandas>=2.0
 python-dotenv>=1.0
