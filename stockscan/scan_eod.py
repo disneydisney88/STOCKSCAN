@@ -28,7 +28,6 @@ from stockscan.io_utils import (
     ensure_dirs,
     lb_to_code5,
     log_error,
-    now_hkt,
     read_csv_if_exists,
     today_hkt,
     ts_hkt,

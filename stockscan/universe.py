@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import argparse
+import sys
 
 import pandas as pd
 
@@ -100,28 +101,23 @@ def mark_delisted(df: pd.DataFrame) -> pd.DataFrame:
 
 def enrich_static(df: pd.DataFrame, lb) -> pd.DataFrame:
     """分批 static_info 補 name_hk / total_shares / hk_shares / lot_size / board；失敗記 static_missing=1 唔好 drop。"""
-    df = df.copy()
-    for col in ("name_hk", "board", "lot_size", "total_shares", "hk_shares", "static_missing"):
+    df = df.copy().reset_index(drop=True)
+    for col in ("name_hk", "board", "lot_size", "total_shares", "hk_shares"):
         df[col] = pd.NA
     df["static_missing"] = 0
     symbols = df["symbol_lb"].tolist()
     info = lb.static_info_batch(symbols) if symbols else {}
-    idx = df.set_index("symbol_lb").index
-    missing = []
-    for sym in symbols:
-        s = info.get(sym)
-        if s is None:
-            missing.append(sym)
+    pos = {sym: i for i, sym in enumerate(symbols)}
+    for sym, s in info.items():
+        j = pos.get(sym)
+        if j is None:
             continue
-        j = df.index[df["symbol_lb"] == sym]
-        if len(j) == 0:
-            continue
-        j = j[0]
         df.at[j, "name_hk"] = s.name_hk or s.name_cn or ""
         df.at[j, "board"] = str(getattr(s.board, "name", s.board))
         df.at[j, "lot_size"] = int(s.lot_size) if s.lot_size else pd.NA
         df.at[j, "total_shares"] = float(s.total_shares) if s.total_shares else pd.NA
         df.at[j, "hk_shares"] = float(s.hk_shares) if s.hk_shares else pd.NA
+    missing = [sym for sym in symbols if sym not in info]
     df.loc[df["symbol_lb"].isin(missing), "static_missing"] = 1
     df.loc[df["static_missing"] == 1, "name_hk"] = df.loc[
         df["static_missing"] == 1, "name_seed"
@@ -170,10 +166,14 @@ def main() -> None:
     args = ap.parse_args()
 
     ensure_dirs()
-    from stockscan.lb_client import LB
+    from stockscan.lb_client import LB, MissingCredentialsError
 
-    lb = LB()
-    df = build(source=args.source, lb=lb)
+    try:
+        lb = LB()
+        df = build(source=args.source, lb=lb)
+    except MissingCredentialsError as e:
+        print(f"[universe] {e}", file=sys.stderr)
+        raise SystemExit(2)
     write_csv(df, UNIVERSE_CSV)
 
     total = len(df)

@@ -1,6 +1,6 @@
 # STOCKSCAN HANDOVER
 
-更新時間（HKT）：2026-09-07 23:15
+更新時間（HKT）：2026-09-07 23:20
 執行者：zcode　交接對象：下一位（Codex / Claude / KL）
 
 > 本工具只供學術研究及風險分析，不構成投資建議。
@@ -9,12 +9,12 @@
 
 | Checkpoint | 狀態 (✅/⚠/❌) | 備註 |
 |---|---|---|
-| H0 地基 | ⚠ | 目錄樹／config／lb_client／probe 全部寫好＋push；**probe 未跑（等 .env）** |
-| H1 宇宙 | ⚠ | universe.py＋`--source full` 開關寫好、pytest 過；**universe.csv 未生成（等 .env）** |
+| H0 地基 | ✅(半) | 目錄樹／config／lb_client 寫好；**首次 push main 完成（commit cd14aca）**；probe 未跑（等 .env） |
+| H1 宇宙 | ⚠ | universe.py＋`--source full` 開關寫好、pytest 過、`_depre` 去重處理好；**universe.csv 未生成（等 .env）** |
 | H2 收市榜 | ⚠ | scan_eod.py＋RTSS fixture（15 隻）寫好；**09-04／09-07 掃描未跑（等 .env）** |
 | H3 即市 | ⚠ | scan_intraday.py（狀態機＋off_hours）寫好；**未實測（等 .env）** |
-| H4 Streamlit | ⚠ | 三 tab 寫好（tab2 缺 secrets 會顯示提示唔會 crash）；**未部署** |
-| H5 部署 | ⚠ | workflow eod_scan.yml 寫好（cron 35 8 * * 1-5 UTC）；**待 KL 貼 Secrets＋手動觸發** |
+| H4 Streamlit | ⚠(半) | 三 tab 寫好；**本機起機冒煙測試過（HTTP 200＋bare-mode 無錯）**；未部署 Cloud |
+| H5 部署 | ⚠ | workflow eod_scan.yml 已 push；**待 KL 貼 GitHub/Streamlit Secrets＋手動觸發** |
 | H6 測試交接 | ✅ | pytest 38 項全綠；README、HANDOVER 齊 |
 
 **卡關一件事：KL 未放 `.env`（三個 LONGPORT_ 變數）入 repo 根目錄。**
