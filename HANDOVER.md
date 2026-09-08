@@ -157,6 +157,8 @@ pytest -q                                      # 49 tests 全綠
 - 各類數量：CB 202、CONSOLIDATION 60、GO 200、IPO 488、PLACING 500、PLACING_AGENT 203、RIGHTS 200、SHELL_VALUE 1,564、SPLIT 60、TRANSFER_MB 83。
 - 公佈日期解析：成功 **3,333/3,560（93.62%）**；失敗 **227** 行保留，`date_parse_failed=1`，原始行保存在 `raw_json`；可解析日期範圍 **1954-09-15 → 2026-08-28**。
 - 新增 `scripts/build_events_db.py`、`stockscan/events.py`；`events_after(code5, date, days)` 已支援 `.hk` 代號及日期窗口。指定驗收查詢 `events_after("00653", "2026-07-03", 180)` 可回傳 00653 合股紀錄。
-- **M2 ⏳ 下一步**：價格庫匯入本地日線快取；原始檔由 KL 已放入，券商射倉目前只有 4 個，M5 按指示先用現有 4 個。
+- **M2 ✅ 價格庫**：`scripts/import_price_library.py` 已匯入 master + delta 共 **648,194** 行，產生／更新 **2,872** 個 `data/cache/daily/{code5}.csv`；日期範圍 **2025-05-02 → 2026-09-02**，每檔包含 `source`（`lb`／`lib`），重疊日 Longbridge 優先。
+- M2 固定 seed 核對：**20 隻 × 5 日 = 100 行**，收市價差絕對值 >1%：**0**；結果見 `data/reports/price_library_validation.csv`，統計見 `data/reports/price_library_import_stats.json`。
+- **M3 ⏳ 下一步**：13 個月 EOD 面板回填；券商射倉目前只有 4 個，M5 按指示先用現有 4 個。
 
 *本規格書及所有產出只供學術研究及風險分析，不構成投資建議。*
