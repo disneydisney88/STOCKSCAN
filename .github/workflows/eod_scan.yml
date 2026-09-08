@@ -40,10 +40,13 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python scripts/run_eod.py --notify
 
+      - name: Report event timing (M4)
+        run: python scripts/report_go_timing.py
+
       - name: Commit radar CSV
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/eod data/universe.csv
+          git add data/eod data/reports data/universe.csv
           git diff --cached --quiet || git commit -m "EOD scan $(date -u +%F_%H:%M UTC)"
           git push

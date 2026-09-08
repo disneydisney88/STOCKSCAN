@@ -14,6 +14,7 @@ import streamlit as st
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from config import (  # noqa: E402
     DISCLAIMER,
+    DATA_DIR,
     EOD_DIR,
     INTRADAY_DIR,
     RTSS_FIXTURE_DATE,
@@ -46,11 +47,11 @@ def data_asof(df: pd.DataFrame) -> str:
     return str(df["scan_time"].dropna().max())[:16]
 
 
-tab1, tab2, tab3, tab4 = st.tabs(
-    ["📊 收市爆量榜（訊號A）", "⚡ 即市掃描（訊號B）", "🔬 對照 RTSS", "🗂 歷史面板"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(
+    ["📊 收市爆量榜（訊號A）", "⚡ 即市掃描（訊號B）", "🔬 對照 RTSS", "🗂 歷史面板", "📈 事件率"])
 
 with tab1:
-    files = [f for f in eod_files() if f.name != "radar_eod_panel.csv"]
+    files = [f for f in eod_files() if f.name not in {"radar_eod_panel.csv", "radar_eod_panel_full.csv"}]
     if not files:
         st.warning("未有 radar_eod_*.csv。先喺本機跑：`python scripts/run_eod.py`")
     else:
@@ -63,7 +64,7 @@ with tab1:
         else:
             st.caption(f"共 {len(df)} 隻，按市值由細到大（RTSS 口徑）。"
                        "成交額／市值單位：百萬港元（M）。　數據截至：" + data_asof(df))
-            st.dataframe(fmt_df(df[RTSS_8_COLS]), use_container_width=True, hide_index=True)
+            st.table(fmt_df(df[RTSS_8_COLS]).style.hide(axis="index"))
             st.download_button("⬇️ 下載完整 CSV",
                                df.to_csv(index=False).encode("utf-8-sig"),
                                file_name=pick.name, mime="text/csv")
@@ -87,10 +88,10 @@ with tab2:
                        f"{meta['scan_time']}")
             if not alerts.empty:
                 st.error("🚨 新 alert（級距「舊→新」）", icon="🚨")
-                st.dataframe(alerts, use_container_width=True, hide_index=True)
+                st.table(alerts.style.hide(axis="index"))
             else:
                 st.info("呢一輪冇新 alert。以下係近門檻 top 20：")
-                st.dataframe(near, use_container_width=True, hide_index=True)
+                st.table(near.style.hide(axis="index"))
         except Exception as e:  # noqa: BLE001——缺 secrets 顯示提示而唔係 crash
             st.warning(
                 "掃唔到：Longbridge 憑證欠齊或 API 出錯。詳情：\n\n"
@@ -104,8 +105,7 @@ with tab2:
         adf = read_csv_if_exists(alert_files[0])
         if not adf.empty:
             st.caption("數據截至：" + str(adf["ts"].dropna().max()))
-            st.dataframe(adf.sort_values("ts", ascending=False),
-                         use_container_width=True, hide_index=True)
+            st.table(adf.sort_values("ts", ascending=False).style.hide(axis="index"))
     else:
         st.info("未有 alerts_*.csv。本機跑 `python scripts/run_intraday.py --once`。")
 
@@ -138,12 +138,11 @@ with tab4:
         c1, c2 = st.columns([1, 2])
         with c1:
             top = panel["code5"].value_counts().head(15)
-            st.dataframe(
-                pd.DataFrame({
+            st.table(pd.DataFrame({
                     "code5": top.index,
                     "上榜次數": top.values,
                     "名稱": [panel.loc[panel["code5"] == c, "name"].iloc[0] for c in top.index],
-                }), use_container_width=True, hide_index=True)
+                }).style.hide(axis="index"))
         with c2:
             pick_code = st.selectbox("點一隻股睇佢所有上榜日", top.index,
                                      format_func=lambda c: f"{c} "
@@ -151,7 +150,16 @@ with tab4:
             rows = panel[panel["code5"] == pick_code].sort_values("scan_date")
             st.dataframe(fmt_df(rows[["scan_date", "close", "chg_pct", "turnover_day",
                                       "mcap_total", "ratio", "turnover_to_mcap"]]),
-                         use_container_width=True, hide_index=True)
+                         use_container_width=True, height=800, hide_index=True)
+
+with tab5:
+    report = DATA_DIR / "reports" / "go_timing_summary.csv"
+    if not report.exists():
+        st.info("未有事件率報表。跑：`python scripts/report_go_timing.py`")
+    else:
+        rdf = read_csv_if_exists(report)
+        st.caption("只列數字；事件窗口由上榜日開始計算。")
+        st.table(rdf.style.hide(axis="index"))
 
 if UNIVERSE_CSV.exists():
     uni = read_csv_if_exists(UNIVERSE_CSV)

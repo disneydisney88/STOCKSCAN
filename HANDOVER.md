@@ -163,5 +163,9 @@ pytest -q                                      # 49 tests 全綠
 - **M3 ✅ EOD 面板**：`scripts/backfill_eod.py --start 2025-06-26 --end 2026-09-07` 純快取完成 **296** 個交易日、**4,036** 行；輸出 `data/eod/radar_eod_panel_full.csv`（同時更新 legacy `radar_eod_panel.csv`）。使用 X0 月度股數；缺股數或有合股／拆股／配股／供股事件的行標 `mcap_unreliable=1`，目前 **4,006/4,036** 行被標記。每日命中數：中位 **13**、最少 **3**、最多 **36**。
 - RTSS `每日摘要` 對照已按月輸出 `data/reports/rtss_monthly_compare.csv`，共 **16** 個月，欄位含 ours／rtss／hits／extra／missing／hit_rate；只記錄數字，不作結論。
 - **M4 ⏳ 下一步**：GO 報時及基準組報表；券商射倉目前只有 4 個，M5 按指示先用現有 4 個。
+- **M4 ✅ GO 報時**：`scripts/report_go_timing.py` 已按 panel 每個（code5，scan_date）計 60／120／180 日後 GO／合股／配股／供股旗標；輸出 `data/reports/go_timing_20260907.csv`（**6,996** 行）及 `go_timing_summary.csv`（24 行）。基準組按每日抽樣最多 10 隻、成交額 ≥1M、市值 <10 億且排除當日上榜股，共 **2,960** 個觀察。
+- M4 分層數字（180 日）：signal GO **109/4,036**、baseline GO **63/2,960**；signal 合股 **82/4,036**、baseline 合股 **80/2,960**；signal 配股 **430/4,036**、baseline 配股 **551/2,960**；signal 供股 **99/4,036**、baseline 供股 **129/2,960**。只記數字，不作結論。
+- Actions 已加 EOD 後執行 `report_go_timing.py`，並將 `data/reports` 一併提交。
+- **M5 ⏳ 下一步**：用現有 4 個券商射倉檔入庫；舊 3 個檔案待日後補充。
 
 *本規格書及所有產出只供學術研究及風險分析，不構成投資建議。*
