@@ -44,11 +44,15 @@ jobs:
         run: python scripts/report_go_timing.py
 
       - name: Fetch CCASS (M7, when secrets are configured)
-        if: ${{ secrets.CCASS_API_URL != '' && secrets.CCASS_API_KEY != '' }}
         env:
           CCASS_API_URL: ${{ secrets.CCASS_API_URL }}
           CCASS_API_KEY: ${{ secrets.CCASS_API_KEY }}
-        run: python scripts/run_ccass.py
+        run: |
+          if [ -n "$CCASS_API_URL" ] && [ -n "$CCASS_API_KEY" ]; then
+            python scripts/run_ccass.py
+          else
+            echo "CCASS secrets not configured; skip M7 fetch."
+          fi
 
       - name: Commit radar CSV
         run: |
