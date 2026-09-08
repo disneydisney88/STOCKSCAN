@@ -170,5 +170,8 @@ pytest -q                                      # 49 tests 全綠
 - **M5 ✅ 券商射倉**：`scripts/import_broker_shots.py` 已解析現有 **4** 個 workbook（舊 3 個未提供），合併 `data/broker_shots.csv` 共 **86,853** 條；日期 **2025-11-03 → 2026-08-05**。新增 `stockscan/broker.py::shots_around(code5, date, days)`。
 - 原始欄位只提供券商名稱及百分比變動，故 `shares_change` 保留空值；`pct_change`、`direction` 按正／負／零解析。panel `radar_eod_panel_full.csv` 已加入 `has_broker_shot`，命中 **1,115** 行（±5 日）。匯入統計見 `data/reports/broker_import_stats.json`。
 - **M6 ⏳ 下一步**：RTSS 歷史 alert 回放及 t+5／t+10／t+20 報酬。
+- **M6 ✅ 訊號 B 歷史回放**：`scripts/replay_signal_b.py` 從 `Parsed_Alerts` 取 `small_cap_surge` **522** 條；本地 cache 命中 **492** 條，缺當日 bar **30** 條。輸出 `data/reports/n_count_forward.csv`（522 行）及 `n_count_forward_summary.csv`（12 個 n_max_est 分層），含 t+5／t+10／t+20 收市對收市中位回報及勝率。
+- M6 分層摘要數字見 `n_count_forward_summary.csv`；欄位使用 `n_max_est`，只作歷史估算，不代表實際當日 alert。
+- **M7 ⏸ 停止**：`CCASS_API_URL` 及 `CCASS_API_KEY` 尚未提供；未建立 CCASS client、未發 API request、未寫入任何 key。待 credentials 提供後再開始 M7。
 
 *本規格書及所有產出只供學術研究及風險分析，不構成投資建議。*
