@@ -39,6 +39,7 @@ from stockscan.io_utils import (
     ensure_dirs,
     lb_to_code5,
     load_state,
+    log_error,
     now_hkt,
     read_csv_if_exists,
     save_state,
@@ -49,7 +50,7 @@ ALERT_COLUMNS = [
     "ts", "code5", "symbol", "name", "alert_type", "count_today",
     "level_from", "level_to", "chg_pct", "last_done",
     "turnover_intraday", "mcap_now", "ratio_intraday", "off_hours",
-    "corp_action_suspect",
+    "corp_action_suspect", "resumption_suspect", "price_gap_suspect",
 ]
 
 
@@ -134,10 +135,23 @@ def scan_once(lb, scan_date: date | None = None) -> tuple[pd.DataFrame, pd.DataF
         pool[sym]["prev_close"] = p_prev
         pool[sym]["corp_action_suspect"] = suspect
         pool[sym]["chg_pct"] = (last / p_prev - 1) * 100 if p_prev > 0 else 0.0
+        # P4 02738 條款：一日跳 ≥4 倍／跌 ≤75% 而事件庫冇記錄 → 好大機會係合股/拆股/復牌
+        # 假訊號（合股後成交額用新股本計，ratio 會虛大同一倍數）。alert 照出，加旗俾人自己判斷。
+        pool[sym]["price_gap_suspect"] = int(
+            not event and p_prev > 0 and (last / p_prev >= 4 or last / p_prev <= 0.25))
+        # P4 復牌／長停牌 guard：快取尾支距 scan 日 >5 個交易日（~8 日曆日）→ 標旗
+        try:
+            last_bar = kline_cache.last_bar_date(lb_to_code5(sym))
+            pool[sym]["resumption_suspect"] = int(
+                last_bar is not None and (d - last_bar).days >= 8)
+        except Exception as e:  # noqa: BLE001——讀唔到就唔標，唔好因為快取搞冧掃描
+            pool[sym]["resumption_suspect"] = 0
+            log_error("scan_intraday.resumption", f"{sym}: {e!r}")
 
     state = load_state(d)
     off_hours = 0 if in_scan_session() else 1
     alerts: list[dict] = []
+    ma10_errors = 0
     for sym, p in sorted(pool.items(), key=lambda kv: -kv[1]["chg_pct"]):
         if p["corp_action_suspect"]:
             continue
@@ -146,7 +160,12 @@ def scan_once(lb, scan_date: date | None = None) -> tuple[pd.DataFrame, pd.DataF
             continue
         rec_all = state.get(sym, {})
         code5 = lb_to_code5(sym)
-        ma10 = ma10_from_cache(code5, d)
+        try:
+            ma10 = ma10_from_cache(code5, d)
+        except Exception as e:  # noqa: BLE001——快取讀唔到（Drive FS 等）要數出嚟，唔准靜靜當冇數據
+            ma10 = None
+            ma10_errors += 1
+            log_error("scan_intraday.ma10", f"{sym}: {e!r}")
         ratio = calc_ratio_intraday(turnover, ma10)
 
         # SURGE（急升）
@@ -186,9 +205,15 @@ def scan_once(lb, scan_date: date | None = None) -> tuple[pd.DataFrame, pd.DataF
     meta = {
         "quoted": len(quotes), "pool": len(pool),
         "alerts": len(alerts), "off_hours": off_hours,
+        "ma10_errors": ma10_errors,
         "elapsed_s": round(time.perf_counter() - t0, 1),
         "scan_time": ts_hkt(),
+        # 內部用（daemon 時點快照／summary）；log 唔好直接印成個 meta
+        "_pool": pool, "_shares": shares, "_names": names,
     }
+    if ma10_errors and ma10_errors * 10 > len(pool):
+        print(f"[scan_intraday] ⚠ ma10 讀取失敗 {ma10_errors}/{len(pool)}——"
+              "VOLUME 會漏報！檢查 Drive FS／快取（詳情 logs/）")
     _log_intraday_stats(meta)
     return pd.DataFrame(alerts, columns=ALERT_COLUMNS), near, meta
 
@@ -210,7 +235,9 @@ def _mk_alert(sym, code5, names, alert_type, rec_all, p, lv_from, lv_to, ratio, 
         "mcap_now": round(p["mcap_now"]),
         "ratio_intraday": round(ratio, 2) if ratio is not None else "",
         "off_hours": off_hours,
-        "corp_action_suspect": 0,
+        "corp_action_suspect": p.get("corp_action_suspect", 0),
+        "resumption_suspect": p.get("resumption_suspect", 0),
+        "price_gap_suspect": p.get("price_gap_suspect", 0),
     }
 
 

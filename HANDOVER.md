@@ -231,6 +231,29 @@ pytest -q                                      # 49 tests 全綠
 | 12 | 3 | 0.0000 | 0.0000 | -13.6674 | 0.0000 | -22.5513 | 0.0000 |
 | missing | 30 | — | — | — | — | — | — |
 
-- Actions 首次真跑預定：2026-09-08 16:35 HKT（UTC 08:35）；完成後補記 workflow 結果。
+- Actions 09-08 首跑結果：**origin 冇 `radar_eod_20260908.csv`**（zcode 無 Actions API 權限睇 log）；已由本機補跑 EOD 09-08 補返（見 §12 Z0）。
 
 *本規格書及所有產出只供學術研究及風險分析，不構成投資建議。*
+
+## 12. 第四階段夜工（zcode，2026-09-08 深夜）
+
+| 任務 | 狀態 | 摘要 |
+|---|---|---|
+| Z0 Actions 首跑檢查 | ⚠ | origin 冇 09-08 radar；本地補跑補返（`radar_eod_20260908.csv`）；KL 話會自己睇 Actions log |
+| Z0 VOLUME 零 alert 診斷 | ✅ | **代碼冇壞**（10a793c 係純重構）——根因係 Drive FS 讀快取失敗時 `kline_cache.load()` 靜靜回 None → ma10=None → VOLUME 無聲跳過（SURGE 唔使 cache 所以倖存）。修復：load 重試 3 次（OSError 類）→ 仍失敗 `raise CacheReadError`；`scan_once` 計 `ma10_errors`，>10% 池大聲警告。回歸測試：RTSS 11 隻實測數字合成快取 → 11/11 VOLUME 全開火；讀取持續失敗必上拋 |
+| Z0 RTSS 即市對照 | ✅ | `tests/fixtures/rtss_intraday_20260908_1330.csv`（11 隻）vs 修復後掃描 `alerts_20260908.csv`：**命中 11/11**；我哋多 7 條 VOLUME（收市後 ratio 繼續累積，正常） |
+| Z0 02738 判定 | ✅ | **合股唔係復牌**：快取 09-03→09-07 連續交易（0.039/0.041/0.043）無停牌間隙，09-08 上 0.4 ≈ 9.3x＝10合1 有效日；events DB 漏記呢單。新 `price_gap_suspect` guard（一日 ±4 倍跳而事件庫冇記錄）已捕捉，兩條 alert 旗標=1 照出 |
+| Z1 daemon | ✅ | `scripts/intraday_daemon.py`：崩潰重啟（5 次/日）、時段外瞓、log 轉檔留 30 日、16:15 summary、時點快照 10:30/11:30/13:30/15:30/16:00。冒煙測試過（啟動/轉檔/判斷時段/乾淨退出）。**排程已真註冊**：`STOCKSCAN_intraday`（State=Ready，每日 01:20 GMT＝09:20 HKT，WakeToRun） |
+| Z1b tab2 時點快照 | ✅ | 最新快照 ⭐ 標記本日首次出現（同日較早快照冇嘅 code） |
+| Z2 CCASS 上游 | 🔶 | 診斷：`/health` 200（冷啟動 49s，服務生）；`/api/stock` 401（本機無 `CCASS_API_KEY`，唔係服務死）。已修 webbsite-ccass-tool 並 push（`50a1290`）：gunicorn `-w 1 --timeout 300`（取代裸 uvicorn）、auto 模式 cache-first（先試 Turso 快照有真數據即回）、新增 `?light=1`（強制 hybrid_light）。**等 Render 部署＋KL 提供 `CCASS_API_KEY` 先可以終測 `?code=01393&light=1`**。spec 中「 threads 2」冇跟——UvicornWorker 係 async，--threads 唔適用，用單 worker 避免免費 plan OOM |
+| Z3 tab6 個股研究 | ✅ | 六區塊：基本／價格+上榜標記／事件 24 個月／射倉 ±5 日／RTSS 回放／CCASS／即市 alert；無數據寫「無紀錄」。驗收 01825（4 上榜日+1 事件）、00254（8+1）、08368（18+1）全部有料 |
+| Z4 數據質量審計 | ✅ | 見 §13；腳本 `scripts/audit_data_quality.py` 可重跑 |
+| Z5 收尾 | ✅ | 本檔更新＋pytest 54 綠＋push。Z5 舊 3 個射倉 xlsx（KL 未放 data/raw，記低）；Telegram 真發（KL 擺低） |
+
+**新流程注意**：daemon 已註冊排程，聽日（09-09）09:20 HKT 會自動開始掃；佢自己判斷交易時段，PC 開機就會行（WakeToRun）。想停：`schtasks /change /tn STOCKSCAN_intraday /disable`。
+
+## 13. 數據質量審計（2026-09-09 00:1x HKT，腳本可重跑）
+
+1. **mcap_unreliable：4,006/4,036 行（99.3%）**——13 個月面板幾乎全部行嘅市值係用「今日股數 × 歷史價」近似（Codex 價格庫 X0 冇歷史股數）。按月 98.2%–100%。**研究含歷史 mcap 嘅結論前必須記住呢點**；上榜名單本身（價量口徑）唔受影響。
+2. 種子 08-31 市值 vs 面板 2026-08-31 mcap_total：可比 21 隻中 **2 隻差 >30%**——00913 港灣數字 +162%（疑似合股/拆股）、00021 大中華控股 +31%（股數口徑/攤薄）。明細 `data/reports/data_quality_audit_20260909.csv`。
+3. 09-08 即市 alert：25 條（VOLUME 18/SURGE 7）；corp_action_suspect=0、resumption_suspect=0、**price_gap_suspect=2**（全部係 02738 華津國際控股 SURGE+VOLUME，+830%/1506x，合股假訊號已正確標記）。

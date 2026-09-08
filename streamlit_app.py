@@ -20,7 +20,7 @@ from config import (  # noqa: E402
     RTSS_FIXTURE_DATE,
     UNIVERSE_CSV,
 )
-from stockscan.io_utils import read_csv_if_exists  # noqa: E402
+from stockscan.io_utils import read_csv_if_exists, today_hkt  # noqa: E402
 
 st.set_page_config(page_title="STOCKSCAN 倍升雷達", page_icon="📡", layout="wide")
 
@@ -47,8 +47,9 @@ def data_asof(df: pd.DataFrame) -> str:
     return str(df["scan_time"].dropna().max())[:16]
 
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs(
-    ["📊 收市爆量榜（訊號A）", "⚡ 即市掃描（訊號B）", "🔬 對照 RTSS", "🗂 歷史面板", "📈 事件率"])
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
+    ["📊 收市爆量榜（訊號A）", "⚡ 即市掃描（訊號B）", "🔬 對照 RTSS", "🗂 歷史面板", "📈 事件率",
+     "🔎 個股研究"])
 
 with tab1:
     files = [f for f in eod_files() if f.name not in {"radar_eod_panel.csv", "radar_eod_panel_full.csv"}]
@@ -109,6 +110,31 @@ with tab2:
     else:
         st.info("未有 alerts_*.csv。本機跑 `python scripts/run_intraday.py --once`。")
 
+    # ── P4 Z1b：時點快照 ──
+    snap_files = sorted(INTRADAY_DIR.glob("snapshot_*.csv"), reverse=True)
+    if snap_files:
+        st.subheader("📷 時點快照（每日 10:30／11:30／13:30／15:30／16:00）")
+        snap = snap_files[0]
+        sdf = read_csv_if_exists(snap)
+        if not sdf.empty:
+            # 本日首次出現：呢張快照有、之前嘅快照冇 → ⭐ 排先
+            earlier_codes = set()
+            for f in snap_files[1:]:
+                if f.name[9:17] == snap.name[9:17]:  # 同一日
+                    prev = read_csv_if_exists(f)
+                    if not prev.empty and "code5" in prev.columns:
+                        earlier_codes |= set(prev["code5"].astype(str))
+            sdf["code5"] = sdf["code5"].astype(str)
+            sdf["首次出現"] = ~sdf["code5"].isin(earlier_codes)
+            sdf = sdf.sort_values("首次出現", ascending=False).reset_index(drop=True)
+            sdf["name"] = sdf.apply(
+                lambda r: ("⭐ " + str(r["name"])) if r["首次出現"] else r["name"], axis=1)
+            st.caption(f"{snap.name.replace('snapshot_', '').replace('.csv', '')}　"
+                       f"ratio≥10 共 {len(sdf)} 隻（⭐＝本日首次出現）")
+            st.dataframe(sdf, use_container_width=True, hide_index=True)
+    else:
+        st.caption("未有時點快照（daemon 會喺 10:30/11:30/13:30/15:30/16:00 自動寫）。")
+
 with tab3:
     st.caption(f"訊號 A 對照「倍升RtSS」{RTSS_FIXTURE_DATE} 榜（15 隻，手打 fixture）。"
                "命中 ≥10/15 為過關門檻。")
@@ -160,6 +186,122 @@ with tab5:
         rdf = read_csv_if_exists(report)
         st.caption("只列數字；事件窗口由上榜日開始計算。")
         st.table(rdf.style.hide(axis="index"))
+
+with tab6:
+    # ── P4 Z3：個股研究頁——一頁睇晒一隻股喺所有庫嘅紀錄（研究用）──
+    import sqlite3
+    from datetime import datetime as _dt
+
+    from stockscan import kline_cache
+    from stockscan.events import events_after
+
+    st.caption("輸入 5 位代號，聚合宇宙／面板／事件庫／券商射倉／RTSS 回放／CCASS／即市 alert。研究用，唔構成投資建議。")
+    code_input = st.text_input("股票代號（5 位）", value="01825", max_chars=5).strip().zfill(5)
+
+    uni_all = read_csv_if_exists(UNIVERSE_CSV)
+    row_u = uni_all[uni_all["code5"] == code_input]
+    if row_u.empty:
+        st.warning(f"{code_input} 唔喺宇宙（檢查代號，或者佢唔喺 universe.csv）。")
+    else:
+        u = row_u.iloc[0]
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("名稱", str(u.get("name_hk") or u.get("name_seed", ""))[:10])
+        ts_total = pd.to_numeric(u.get("total_shares"), errors="coerce")
+        c2.metric("總股數", f"{ts_total / 1e6:,.0f}M" if pd.notna(ts_total) else "—")
+        c3.metric("in_seed(08-31)", str(u.get("in_seed", "—")))
+        c4.metric("REIT", str(u.get("is_reit", "—")))
+
+        # 1) 價格＋上榜日（13 個月快取）
+        kdf = kline_cache.load(code_input)
+        panel_full = read_csv_if_exists(EOD_DIR / "radar_eod_panel_full.csv")
+        if panel_full.empty:
+            panel_full = read_csv_if_exists(EOD_DIR / "radar_eod_panel.csv")
+        hit_days = set()
+        if not panel_full.empty:
+            hits = panel_full[panel_full["code5"] == code_input]
+            hit_days = set(hits["scan_date"]) if "scan_date" in hits.columns else set()
+        if kdf is None or kdf.empty:
+            st.info("快取無價格紀錄。")
+        else:
+            kdf = kdf.copy()
+            kdf["上榜"] = kdf["date"].isin(hit_days)
+            kdf["date_dt"] = pd.to_datetime(kdf["date"])
+            chart = kdf.set_index("date_dt")[["close"]]
+            st.line_chart(chart, height=200)
+            n_hit = int(kdf["上榜"].sum())
+            st.caption(f"快取 {len(kdf)} 支（{kdf['date'].iloc[0]}→{kdf['date'].iloc[-1]}）；"
+                       f"面板上榜 {n_hit} 日"
+                       + (f"：{', '.join(sorted(hit_days))}" if hit_days else ""))
+
+        # 2) 事件（最近 24 個月）
+        st.subheader("📅 事件（24 個月內）")
+        try:
+            evs = events_after(code_input, (today_hkt() - pd.Timedelta(days=730).to_pytimedelta()), 730)
+        except Exception as e:  # noqa: BLE001
+            evs = []
+            st.caption(f"事件庫讀取失敗：{e!r}")
+        if evs:
+            st.dataframe(pd.DataFrame(evs)[
+                ["event_type", "announce_date", "key_date_1", "ratio", "status"]
+            ], use_container_width=True, hide_index=True)
+        else:
+            st.write("無紀錄")
+
+        # 3) 券商射倉：面板上榜日 ±5 日
+        st.subheader("🏛 券商射倉（上榜日 ±5 日）")
+        shots = read_csv_if_exists(DATA_DIR / "broker_shots.csv")
+        shown_shots = False
+        if not shots.empty and hit_days and "code5" in shots.columns:
+            sc = shots[shots["code5"] == code_input].copy()
+            if not sc.empty and "date" in sc.columns:
+                sc["date_dt"] = pd.to_datetime(sc["date"], errors="coerce")
+                near_rows = sc[sc["date_dt"].apply(
+                    lambda x: any(abs((x - pd.Timestamp(h)).days) <= 5 for h in hit_days))]
+                if not near_rows.empty:
+                    st.dataframe(near_rows.drop(columns=["date_dt"]),
+                                 use_container_width=True, hide_index=True)
+                    shown_shots = True
+        if not shown_shots:
+            st.write("無紀錄")
+
+        # 4) RTSS 歷史回放（M6）
+        st.subheader("🔁 RTSS 歷史回放（522 條研究）")
+        nf = read_csv_if_exists(DATA_DIR / "reports" / "n_count_forward.csv")
+        if nf.empty or "code5" not in nf.columns:
+            st.write("無紀錄")
+        else:
+            nr = nf[nf["code5"].astype(str).str.zfill(5) == code_input]
+            if nr.empty:
+                st.write("無紀錄")
+            else:
+                st.caption(f"出現 {len(nr)} 次（n_max_est 為歷史估算）")
+                st.dataframe(nr, use_container_width=True, hide_index=True)
+
+        # 5) CCASS（M7）
+        st.subheader("🏦 CCASS 集中度和主要變動")
+        cc_dir = DATA_DIR / "ccass" / code_input
+        cc_files = sorted(cc_dir.glob("*.json")) if cc_dir.exists() else []
+        if not cc_files:
+            st.write("無紀錄（上游 Render API 修復後，跑 `python scripts/run_ccass.py` 會生成）")
+        else:
+            for f in cc_files[-3:]:
+                st.caption(f"📄 {f.name}")
+                st.json(json.loads(f.read_text(encoding="utf-8")))
+
+        # 6) 即市 alert（今日）
+        st.subheader("⚡ 即市 alert（所有日子）")
+        hit_alerts = []
+        for af in sorted(INTRADAY_DIR.glob("alerts_*.csv"), reverse=True)[:5]:
+            adf = read_csv_if_exists(af)
+            if not adf.empty and "code5" in adf.columns:
+                m = adf[adf["code5"].astype(str).str.zfill(5) == code_input]
+                if not m.empty:
+                    hit_alerts.append(m)
+        if hit_alerts:
+            st.dataframe(pd.concat(hit_alerts, ignore_index=True),
+                         use_container_width=True, hide_index=True)
+        else:
+            st.write("無紀錄")
 
 if UNIVERSE_CSV.exists():
     uni = read_csv_if_exists(UNIVERSE_CSV)

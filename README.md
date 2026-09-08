@@ -82,3 +82,21 @@ pytest -q                                 # 測試
 ## 接手
 
 睇 [`HANDOVER.md`](HANDOVER.md)——checkpoint 狀態、probe 實測、RTSS 對照結果、下手清單。
+
+## 即市 daemon 點開點停（P4）
+
+```bash
+# 手動前景跑（測試用）
+python scripts/intraday_daemon.py        # Ctrl-C 離開
+
+# 排程（已註冊：STOCKSCAN_intraday，每日機器時間 01:20 = HKT 09:20，WakeToRun）
+schtasks /query    /tn STOCKSCAN_intraday          # 睇狀態
+schtasks /change   /tn STOCKSCAN_intraday /disable # 停
+schtasks /change   /tn STOCKSCAN_intraday /enable  # 開返
+schtasks /run      /tn STOCKSCAN_intraday          # 立即跑一次
+```
+
+daemon 會：交易日 09:30–12:00／13:00–16:10 HKT 每 60 秒掃一次；時點快照
+10:30／11:30／13:30／15:30／16:00 寫 `data/intraday/snapshot_*.csv`；
+16:15 寫當日 `summary_*.csv`；log 落 `logs/intraday_YYYYMMDD.log`（留 30 日）；
+崩潰自動重啟（每日最多 5 次）。

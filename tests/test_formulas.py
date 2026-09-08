@@ -243,3 +243,95 @@ def test_rtss_compare_matches_fixture():
     res = json.loads(cmp_path.read_text(encoding="utf-8"))
     assert res["hit_count"] == 15
     assert res["missing"] == [] and res["extra"] == []
+
+
+# ── P4 Z0 回歸：09-08 14:07 零 VOLUME 事件 ──
+
+def test_volume_fires_for_rtss_intraday_fixture(tmp_path, monkeypatch):
+    """RTSS 即市 11 隻（13:30 名單）用 09-08 實測 turnover/ma10 數字。
+    快取健康時，VOLUME 必須全部開火——證明 10a793c 重構無改壞觸發，
+    以後任何改動整冧 VOLUME 都會喺度爆。"""
+    import io as _io
+    from datetime import datetime, timezone
+    from types import SimpleNamespace
+
+    import stockscan.kline_cache as kc
+    import stockscan.scan_intraday as si
+    import stockscan.io_utils as iou
+
+    # RTSS 11 隻：(code5, 當日 turnover, ma10)——2026-09-08 收市後實測
+    data = {
+        "08238": (4910941, 80778), "01842": (1840160, 76850),
+        "01443": (2005642, 12805), "08481": (882800, 24748),
+        "06988": (8472882, 138005), "01001": (573751, 36458),
+        "02738": (9197230, 6107), "00096": (520000, 1631),
+        "00690": (4052440, 75740), "08189": (3626775, 72630),
+        "00829": (2295780, 121313),
+    }
+
+    monkeypatch.setattr(kc, "CACHE_DIR", tmp_path / "cache")
+    monkeypatch.setattr(kc, "_MEMO", {})
+    monkeypatch.setattr(si, "corporate_action_on", lambda *a, **k: None)
+    monkeypatch.setattr(iou, "STATE_DIR", tmp_path / "state")
+
+    # 快取：scan 日（09-08）前 10 支 bar，turnover 一律 = ma10 → ma10 恰好等於實測值
+    bars = []
+    for day in ("2026-08-25", "2026-08-26", "2026-08-27", "2026-08-28", "2026-08-31",
+                "2026-09-01", "2026-09-02", "2026-09-03", "2026-09-04", "2026-09-07"):
+        y, m, dd = map(int, day.split("-"))
+        bars.append(SimpleNamespace(timestamp=datetime(y, m, dd, 16, tzinfo=timezone.utc),
+                                    open=1, high=1, low=1, close=1, volume=1, turnover=1.0))
+    for code5, (to, ma) in data.items():
+        adj = [SimpleNamespace(**{**b.__dict__, "turnover": float(ma)}) for b in bars]
+        kc.merge_save(code5, adj)
+
+    # 假宇宙 + 假 LB
+    uni = pd.DataFrame([
+        {"code5": c, "symbol_lb": f"{int(c)}.HK", "name_hk": f"N{c}", "name_seed": f"N{c}",
+         "in_scan": 1, "total_shares": 1e8}
+        for c in data
+    ])
+    uni_path = tmp_path / "universe.csv"
+    uni.to_csv(uni_path, index=False)
+    monkeypatch.setattr(si, "UNIVERSE_CSV", uni_path)
+    monkeypatch.setattr(si, "in_scan_session", lambda: True)
+    captured = {}
+    monkeypatch.setattr(si, "_alerts_path", lambda d: tmp_path / "alerts.csv")
+    monkeypatch.setattr(si, "append_csv",
+                        lambda df, path: captured.update(df=df.to_dict("records")))
+
+    class FakeLB:
+        def quote_batch(self, symbols):
+            out = {}
+            for sym in symbols:
+                c = sym.split(".")[0].zfill(5)
+                out[sym] = SimpleNamespace(prev_close=1.0, last_done=1.05,
+                                           turnover=float(data[c][0]))
+            return out
+
+    alerts, near, meta = si.scan_once(FakeLB(), date(2026, 9, 8))
+    vol = alerts[alerts["alert_type"] == "VOLUME"]
+    assert len(vol) == 11, f"VOLUME 應 11 條，實得 {len(vol)}：{alerts.to_dict('records')}"
+    assert set(vol["code5"]) == set(data)
+    assert meta["ma10_errors"] == 0
+
+
+def test_cache_load_raises_on_persistent_read_error(tmp_path, monkeypatch):
+    """Z0 根因修復：快取讀失敗唔可以靜靜回 None（會令 VOLUME 無聲全跳過）——要上拋。"""
+    import stockscan.kline_cache as kc
+
+    (tmp_path / "daily").mkdir()
+    p = tmp_path / "daily" / "99997.csv"
+    p.write_text("date,close\n2026-09-07,1.0\n", encoding="utf-8")
+    monkeypatch.setattr(kc, "CACHE_DIR", tmp_path)
+    monkeypatch.setattr(kc, "_MEMO", {})
+
+    def boom(*a, **k):
+        raise OSError("Drive FS not responding")
+
+    monkeypatch.setattr(kc.pd, "read_csv", boom)
+    import pytest
+    with pytest.raises(kc.CacheReadError):
+        kc.load("99997")
+    # 檔案唔存在 → None（正常路徑不受影響）
+    assert kc.load("99996") is None

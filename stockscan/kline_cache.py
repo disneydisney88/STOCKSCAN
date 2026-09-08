@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import threading
+import time
 from datetime import date
 from pathlib import Path
 
@@ -28,21 +29,45 @@ def cache_path(code5: str) -> Path:
     return CACHE_DIR / "daily" / f"{code5}.csv"
 
 
+class CacheReadError(RuntimeError):
+    """快取檔存在但讀唔到（Drive FS 抽風／檔案損壞）。
+
+    P4 教訓（09-08 14:07 零 VOLUME 事件）：以前讀失敗靜靜回 None，
+    呼叫方當「冇數據」——VOLUME 全數無聲跳過。而家改為重試之後上拋，
+    由呼叫方計數並大聲警告。"""
+
+
 def load(code5: str) -> pd.DataFrame | None:
+    """讀快取。檔案唔存在 → None（正常）；存在但讀唔到 → 重試 3 次後 raise CacheReadError。"""
     if code5 in _MEMO:
         return _MEMO[code5]
     p = cache_path(code5)
     if not p.exists():
         return None
-    try:
-        df = pd.read_csv(p, dtype={"date": str})
-        df = df if len(df) else None
-    except Exception as e:  # noqa: BLE001——快取檔壞咗就當冇，重新拉
-        log_error("cache.load", f"{code5}: {e!r}")
-        df = None
-    if df is not None:
-        _MEMO[code5] = df
-    return df
+    last_err: Exception | None = None
+    for attempt in range(3):
+        try:
+            df = pd.read_csv(p, dtype={"date": str})
+            df = df if len(df) else None
+            if df is not None:
+                _MEMO[code5] = df
+            return df
+        except OSError as e:
+            # Drive FS 瞬時故障——等一等重試（唔同於檔案損壞）
+            last_err = e
+            time.sleep(0.4 * (attempt + 1))
+        except Exception as e:  # noqa: BLE001——真·檔案損壞，即場記低
+            log_error("cache.load", f"{code5}: {e!r}")
+            raise CacheReadError(f"{code5}: {e!r}") from e
+    raise CacheReadError(f"{code5}: 讀取重試 3 次都失敗：{last_err!r}")
+
+
+def last_bar_date(code5: str) -> date | None:
+    """快取尾支日 K 嘅日期（HKT）；冇快取回 None。讀取失敗會上拋 CacheReadError。"""
+    df = load(code5)
+    if df is None or df.empty:
+        return None
+    return date.fromisoformat(df["date"].iloc[-1])
 
 
 def merge_save(code5: str, rows: list) -> pd.DataFrame:

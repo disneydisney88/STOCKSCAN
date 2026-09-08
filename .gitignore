@@ -19,3 +19,9 @@ desktop.ini
 
 # 日線快取：1,500+ 細檔，Drive 已同步；Actions 每日全量重拉即市窗，入 git 冇著數
 data/cache/
+
+# pytest 殘渣（某啲測試喺 cwd 起 tmp 夾）
+.pytest-tmp*/
+
+# 原始檔（第三階段來源）——Drive 已同步，原檔唔變動，repo 保持精簡
+data/raw/
