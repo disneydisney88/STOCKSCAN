@@ -43,6 +43,13 @@ jobs:
       - name: Report event timing (M4)
         run: python scripts/report_go_timing.py
 
+      - name: Fetch CCASS (M7, when secrets are configured)
+        if: ${{ secrets.CCASS_API_URL != '' && secrets.CCASS_API_KEY != '' }}
+        env:
+          CCASS_API_URL: ${{ secrets.CCASS_API_URL }}
+          CCASS_API_KEY: ${{ secrets.CCASS_API_KEY }}
+        run: python scripts/run_ccass.py
+
       - name: Commit radar CSV
         run: |
           git config user.name "github-actions[bot]"
