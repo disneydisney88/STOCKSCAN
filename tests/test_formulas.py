@@ -17,7 +17,12 @@ from stockscan.io_utils import (  # noqa: E402
     seed_code_to_lb,
 )
 from stockscan.scan_eod import calc_ma, calc_ratio  # noqa: E402
-from stockscan.scan_intraday import decide_alert, level_of  # noqa: E402
+from stockscan.scan_intraday import calc_ratio_intraday, decide_alert, level_of  # noqa: E402
+
+
+def test_intraday_ratio_is_numeric():
+    assert calc_ratio_intraday(1_250_000, 250_000) == 5.0
+    assert calc_ratio_intraday(1_250_000, None) is None
 
 
 # ── 代號轉換 ──

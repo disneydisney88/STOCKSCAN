@@ -95,6 +95,13 @@ def ma10_from_cache(code5: str, scan_date: date) -> float | None:
     return sum(vals) / len(vals)
 
 
+def calc_ratio_intraday(turnover: float, ma10: float | None) -> float | None:
+    """Actual intraday turnover ratio used by both SURGE and VOLUME alerts."""
+    if ma10 is None or ma10 <= 0:
+        return None
+    return turnover / ma10
+
+
 def scan_once(lb, scan_date: date | None = None) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
     """掃一次即市。回傳 (alerts_df, 近門檻榜 near_df, meta)。alert 追加寫 CSV＋更新狀態檔。"""
     ensure_dirs()
@@ -140,7 +147,7 @@ def scan_once(lb, scan_date: date | None = None) -> tuple[pd.DataFrame, pd.DataF
         rec_all = state.get(sym, {})
         code5 = lb_to_code5(sym)
         ma10 = ma10_from_cache(code5, d)
-        ratio = turnover / ma10 if ma10 and ma10 > 0 else None
+        ratio = calc_ratio_intraday(turnover, ma10)
 
         # SURGE（急升）
         fire, lv_from, lv_to = decide_alert(rec_all.get("SURGE"), p["chg_pct"],
