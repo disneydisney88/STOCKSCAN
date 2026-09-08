@@ -167,5 +167,8 @@ pytest -q                                      # 49 tests 全綠
 - M4 分層數字（180 日）：signal GO **109/4,036**、baseline GO **63/2,960**；signal 合股 **82/4,036**、baseline 合股 **80/2,960**；signal 配股 **430/4,036**、baseline 配股 **551/2,960**；signal 供股 **99/4,036**、baseline 供股 **129/2,960**。只記數字，不作結論。
 - Actions 已加 EOD 後執行 `report_go_timing.py`，並將 `data/reports` 一併提交。
 - **M5 ⏳ 下一步**：用現有 4 個券商射倉檔入庫；舊 3 個檔案待日後補充。
+- **M5 ✅ 券商射倉**：`scripts/import_broker_shots.py` 已解析現有 **4** 個 workbook（舊 3 個未提供），合併 `data/broker_shots.csv` 共 **86,853** 條；日期 **2025-11-03 → 2026-08-05**。新增 `stockscan/broker.py::shots_around(code5, date, days)`。
+- 原始欄位只提供券商名稱及百分比變動，故 `shares_change` 保留空值；`pct_change`、`direction` 按正／負／零解析。panel `radar_eod_panel_full.csv` 已加入 `has_broker_shot`，命中 **1,115** 行（±5 日）。匯入統計見 `data/reports/broker_import_stats.json`。
+- **M6 ⏳ 下一步**：RTSS 歷史 alert 回放及 t+5／t+10／t+20 報酬。
 
 *本規格書及所有產出只供學術研究及風險分析，不構成投資建議。*
