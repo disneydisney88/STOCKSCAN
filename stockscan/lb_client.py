@@ -139,6 +139,12 @@ class LB:
                 out[s.symbol] = s
         return out
 
+    def security_list(self) -> list:
+        """Return the current HK equity security list for universe refresh."""
+        from longbridge.openapi import Market
+
+        return self._retry("security_list[HK]", lambda: self.ctx.security_list(Market.HK))
+
     def candles_today(self, symbol: str, n: int = 11) -> list:
         """日 K 最近 n 支（含今日即市 bar）——訊號 A「今日」跑法。"""
         from longbridge.openapi import AdjustType, Period
