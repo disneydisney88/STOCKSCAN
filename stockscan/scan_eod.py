@@ -32,6 +32,7 @@ from config import (
 )
 from stockscan import kline_cache
 from stockscan.calendar_hk import trading_days
+from stockscan.events import action_prev_close, corporate_action_on
 from stockscan.io_utils import (
     ensure_dirs,
     lb_to_code5,
@@ -46,6 +47,7 @@ OUT_COLUMNS = [
     "code5", "symbol", "name", "close", "chg_pct", "turnover_day",
     "mcap_total", "mcap_hk", "ma10", "ratio", "turnover_to_mcap",
     "ma10_days_available", "ma_short", "has_domestic_shares", "scan_time",
+    "corp_action_suspect",
 ]
 
 
@@ -184,7 +186,9 @@ def build_eod(lb, date_arg: date | None = None, cache_only: bool = False,
         if (ts_total is None or pd.isna(ts_total) or ts_total <= 0
                 or not close or not turnover_day or ratio is None):
             continue  # NaN total_shares（static_missing）都會喺度擋埋
-        chg = (close / prev_close - 1) * 100 if prev_close else None
+        event = corporate_action_on(lb_to_code5(sym), scan_date)
+        effective_prev, corp_action_suspect = action_prev_close(prev_close or 0, event)
+        chg = (close / effective_prev - 1) * 100 if effective_prev else None
         mcap_total = close * ts_total
         hk = hk_sh.get(sym)
         mcap_hk = close * hk if hk and hk > 0 else None
@@ -204,8 +208,9 @@ def build_eod(lb, date_arg: date | None = None, cache_only: bool = False,
             "ma_short": 1 if n_avail < MA_DAYS else 0,
             "has_domestic_shares": dom.get(sym, 0),
             "scan_time": ts_hkt(),
+            "corp_action_suspect": corp_action_suspect,
             "_keep": bool(mcap_total < MCAP_CAP_EOD and turnover_day > TURNOVER_MIN
-                          and ratio >= RATIO_MIN),
+                          and ratio >= RATIO_MIN and not corp_action_suspect),
         })
 
     df = pd.DataFrame([{k: v for k, v in r.items() if k != "_keep"} for r in rows if r["_keep"]],

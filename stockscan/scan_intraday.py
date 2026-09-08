@@ -33,6 +33,7 @@ from config import (
 )
 from stockscan import kline_cache
 from stockscan.calendar_hk import in_scan_session
+from stockscan.events import action_prev_close, corporate_action_on
 from stockscan.io_utils import (
     append_csv,
     ensure_dirs,
@@ -48,6 +49,7 @@ ALERT_COLUMNS = [
     "ts", "code5", "symbol", "name", "alert_type", "count_today",
     "level_from", "level_to", "chg_pct", "last_done",
     "turnover_intraday", "mcap_now", "ratio_intraday", "off_hours",
+    "corp_action_suspect",
 ]
 
 
@@ -120,11 +122,18 @@ def scan_once(lb, scan_date: date | None = None) -> tuple[pd.DataFrame, pd.DataF
             "chg_pct": (last / prev - 1) * 100,
             "mcap_now": last * ts_total,
         }
+        event = corporate_action_on(lb_to_code5(sym), d)
+        p_prev, suspect = action_prev_close(prev, event)
+        pool[sym]["prev_close"] = p_prev
+        pool[sym]["corp_action_suspect"] = suspect
+        pool[sym]["chg_pct"] = (last / p_prev - 1) * 100 if p_prev > 0 else 0.0
 
     state = load_state(d)
     off_hours = 0 if in_scan_session() else 1
     alerts: list[dict] = []
     for sym, p in sorted(pool.items(), key=lambda kv: -kv[1]["chg_pct"]):
+        if p["corp_action_suspect"]:
+            continue
         turnover = p["turnover"]
         if turnover < INTRA_TURNOVER_MIN:
             continue
@@ -194,6 +203,7 @@ def _mk_alert(sym, code5, names, alert_type, rec_all, p, lv_from, lv_to, ratio, 
         "mcap_now": round(p["mcap_now"]),
         "ratio_intraday": round(ratio, 2) if ratio is not None else "",
         "off_hours": off_hours,
+        "corp_action_suspect": 0,
     }
 
 

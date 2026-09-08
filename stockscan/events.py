@@ -2,12 +2,55 @@
 from __future__ import annotations
 
 import sqlite3
+import re
 from datetime import date, timedelta
 from pathlib import Path
 
 from config import DATA_DIR
 
 EVENTS_DB = DATA_DIR / "events.db"
+
+
+def corporate_action_on(code5: str, effective_date: str | date,
+                        db_path: Path = EVENTS_DB) -> dict | None:
+    """Return a same-day consolidation/split event, if one is recorded."""
+    day = effective_date.isoformat() if isinstance(effective_date, date) else str(effective_date)
+    code = code5.replace(".hk", "").zfill(5)
+    with sqlite3.connect(db_path) as con:
+        con.row_factory = sqlite3.Row
+        row = con.execute(
+            """SELECT event_type, code5, name, announce_date, key_date_1,
+                      key_date_2, ratio, status, raw_json
+                 FROM events
+                WHERE code5 = ?
+                  AND event_type IN ('CONSOLIDATION', 'SPLIT')
+                  AND (key_date_1 = ? OR key_date_2 = ?)
+                ORDER BY rowid LIMIT 1""",
+            (code, day, day),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def action_prev_close(prev_close: float, event: dict | None) -> tuple[float, int]:
+    """Adjust the old close for a simple ``old:new`` consolidation/split ratio.
+
+    Returns ``(effective_prev_close, corp_action_suspect)``. Unknown or
+    ambiguous ratios are deliberately marked suspect so scanners do not alert.
+    """
+    if not event:
+        return prev_close, 0
+    ratio = str(event.get("ratio") or "")
+    nums = [float(x) for x in re.findall(r"\d+(?:\.\d+)?", ratio)]
+    if len(nums) != 2 or nums[0] <= 0 or nums[1] <= 0:
+        return prev_close, 1
+    text = ratio.lower().replace(" ", "")
+    if ":" in text or "/" in text or "=" in text or "對" in text:
+        return prev_close * nums[0] / nums[1], 0
+    if event.get("event_type") == "CONSOLIDATION" and ("合" in ratio or "合股" in ratio):
+        return prev_close * nums[0] / nums[1], 0
+    if event.get("event_type") == "SPLIT" and ("拆" in ratio or "股" in ratio):
+        return prev_close * nums[0] / nums[1], 0
+    return prev_close, 1
 
 
 def events_after(code5: str, start: str | date, days: int,
