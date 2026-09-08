@@ -174,7 +174,8 @@ pytest -q                                      # 49 tests 全綠
 - M6 分層摘要數字見 `n_count_forward_summary.csv`；欄位使用 `n_max_est`，只作歷史估算，不代表實際當日 alert。
 - **M7 ⏸ 停止**：`CCASS_API_URL` 及 `CCASS_API_KEY` 尚未提供；未建立 CCASS client、未發 API request、未寫入任何 key。待 credentials 提供後再開始 M7。
 - **M7 ⏸ 外部 blocker**：已從 `%USERPROFILE%\.stockscan\` 兩個原始檔抽出並寫入標準 `.env`（另加 `LONGBRIDGE_REGION=hk`），五個變數已用 `lb_client.ensure_credentials()` 驗證；原始 `LONGBRIDGE_APP.ENV` 及 `httpswebbsite-ccass-a.env` 已刪除。
-- 新增 `stockscan/ccass.py`、`scripts/run_ccass.py`；API `/health` 回 **200**，`/api/date-alignment` 回 **200**，但代表性 `/api/stock?code=00261` 在 health 等待 60 秒後仍因服務端上游 timeout 失敗（成功 **0/1**，未生成成功 CCASS JSON）。失敗已透過 `log_error` 落 `logs/errors_YYYYMMDD.log`；未對全日股票盲目重試。
+- 新增 `stockscan/ccass.py`、`scripts/run_ccass.py`；API `/health` 回 **200**，`/api/date-alignment` 回 **200**。`/api/stock` 現改為每次 timeout **180 秒**，失敗退避重試 **2 次**、每次間隔 **30 秒**。
+- 依規格先用 `01393` 單股試跑，3 次均因 `RemoteDisconnected` 失敗（成功 **0/1**），所以未啟動 09-07 全榜掃描，亦未生成成功 CCASS JSON。失敗已透過 `log_error` 落 `logs/errors_YYYYMMDD.log`。
 - M7 client 已支援 health、date alignment、Concentration／Big Changes payload 保存、`ccass_top5_pct_t2`／`ccass_top10_pct_t2` 欄位及逐股失敗記錄；Actions 加入只在 `CCASS_API_URL`／`CCASS_API_KEY` secrets 存在時執行的 gated step。待 API `/api/stock` 上游恢復後重跑 `python scripts/run_ccass.py`。
 
 *本規格書及所有產出只供學術研究及風險分析，不構成投資建議。*

@@ -36,11 +36,26 @@ def health() -> dict:
     return request_json("/health", timeout=10)
 
 
-def fetch_stock(code5: str) -> dict:
-    return request_json("/api/stock", {
+def fetch_stock(code5: str, timeout: int = 180, retries: int = 2, retry_delay: int = 30) -> dict:
+    params = {
         "code": str(code5).zfill(5), "source_preference": "auto",
         "concentration_limit": 100, "big_changes_limit": 100, "changes_limit": 100,
-    })
+    }
+    last_error: Exception | None = None
+    for attempt in range(retries + 1):
+        try:
+            return request_json("/api/stock", params, timeout=timeout)
+        except Exception as exc:
+            last_error = exc
+            if attempt >= retries:
+                raise
+            log_error(
+                "ccass.stock.retry",
+                f"{params['code']} attempt {attempt + 1}/{retries + 1}: {type(exc).__name__}",
+            )
+            time.sleep(retry_delay)
+    assert last_error is not None
+    raise last_error
 
 
 def date_alignment(event_date: str) -> dict:
