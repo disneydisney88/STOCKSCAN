@@ -151,4 +151,12 @@ pytest -q                                      # 49 tests 全綠
 
 `cd14aca` 骨架 → `564267a` polish → `a60b40e` SDK 轉 longbridge → `e7520c1` P1 快取＋P3 升級＋兩日 radar → `03e1434` P2 面板＋P4/P5/P6 → `a2d9617` workflow 雙 Secret 名 → 最新：NaN guard＋full 宇宙重掃＋本檔。
 
+## 11. 第三階段進度（Codex，2026-09-08）
+
+- **M1 ✅ 事件庫**：`data/events.db` 已由 `data/raw/` 內 10 個事件 CSV 建立；共 **3,560** 行。
+- 各類數量：CB 202、CONSOLIDATION 60、GO 200、IPO 488、PLACING 500、PLACING_AGENT 203、RIGHTS 200、SHELL_VALUE 1,564、SPLIT 60、TRANSFER_MB 83。
+- 公佈日期解析：成功 **3,333/3,560（93.62%）**；失敗 **227** 行保留，`date_parse_failed=1`，原始行保存在 `raw_json`；可解析日期範圍 **1954-09-15 → 2026-08-28**。
+- 新增 `scripts/build_events_db.py`、`stockscan/events.py`；`events_after(code5, date, days)` 已支援 `.hk` 代號及日期窗口。指定驗收查詢 `events_after("00653", "2026-07-03", 180)` 可回傳 00653 合股紀錄。
+- **M2 ⏳ 下一步**：價格庫匯入本地日線快取；原始檔由 KL 已放入，券商射倉目前只有 4 個，M5 按指示先用現有 4 個。
+
 *本規格書及所有產出只供學術研究及風險分析，不構成投資建議。*
