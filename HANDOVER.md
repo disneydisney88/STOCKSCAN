@@ -160,5 +160,8 @@ pytest -q                                      # 49 tests 全綠
 - **M2 ✅ 價格庫**：`scripts/import_price_library.py` 已匯入 master + delta 共 **648,194** 行，產生／更新 **2,872** 個 `data/cache/daily/{code5}.csv`；日期範圍 **2025-05-02 → 2026-09-02**，每檔包含 `source`（`lb`／`lib`），重疊日 Longbridge 優先。
 - M2 固定 seed 核對：**20 隻 × 5 日 = 100 行**，收市價差絕對值 >1%：**0**；結果見 `data/reports/price_library_validation.csv`，統計見 `data/reports/price_library_import_stats.json`。
 - **M3 ⏳ 下一步**：13 個月 EOD 面板回填；券商射倉目前只有 4 個，M5 按指示先用現有 4 個。
+- **M3 ✅ EOD 面板**：`scripts/backfill_eod.py --start 2025-06-26 --end 2026-09-07` 純快取完成 **296** 個交易日、**4,036** 行；輸出 `data/eod/radar_eod_panel_full.csv`（同時更新 legacy `radar_eod_panel.csv`）。使用 X0 月度股數；缺股數或有合股／拆股／配股／供股事件的行標 `mcap_unreliable=1`，目前 **4,006/4,036** 行被標記。每日命中數：中位 **13**、最少 **3**、最多 **36**。
+- RTSS `每日摘要` 對照已按月輸出 `data/reports/rtss_monthly_compare.csv`，共 **16** 個月，欄位含 ours／rtss／hits／extra／missing／hit_rate；只記錄數字，不作結論。
+- **M4 ⏳ 下一步**：GO 報時及基準組報表；券商射倉目前只有 4 個，M5 按指示先用現有 4 個。
 
 *本規格書及所有產出只供學術研究及風險分析，不構成投資建議。*
