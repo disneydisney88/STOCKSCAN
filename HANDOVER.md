@@ -274,3 +274,5 @@ pytest -q                                      # 49 tests 全綠
 - T4 remote commit：`0134463`。
 - T5：新增 `scripts/import_rtss_backfill.py`，支援 TGWebExporter CSV／SQLite，按 HKT timestamp 過濾日期、只讀 `message_text`，用同一 parser 寫入 gitignored `data/rtss/rtss_alerts_YYYYMMDD.csv`；source 原有資料範圍及 parse 統計只報數字。
 - T5 parser 修正：兼容 TGWebExporter「一行一條 alert」格式，label 後按數字＋單位擷取，不把後續欄位誤併入市值／成交額。
+- T5 remote commit：`22a60b8`。
+- T6：Streamlit 新增標示「9️⃣ RTSS 對照」tab，逐日讀 diff report，顯示 both／rtss_only／stockscan_only 指標、趨勢及分組明細；不讀取 RTSS 圖片或 raw text。
