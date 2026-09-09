@@ -47,9 +47,9 @@ def data_asof(df: pd.DataFrame) -> str:
     return str(df["scan_time"].dropna().max())[:16]
 
 
-tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs(
     ["📊 收市爆量榜（訊號A）", "⚡ 即市掃描（訊號B）", "🔬 對照 RTSS", "🗂 歷史面板", "📈 事件率",
-     "🔎 個股研究", "9️⃣ RTSS 對照"])
+     "🔎 個股研究", "9️⃣ RTSS 對照", "🐤 春江鴨", "🧩 L 型候選"])
 
 with tab1:
     files = [f for f in eod_files() if f.name not in {"radar_eod_panel.csv", "radar_eod_panel_full.csv"}]
@@ -353,6 +353,36 @@ with tab7:
                 st.dataframe(part, use_container_width=True, height=800, hide_index=True)
         else:
             st.info("呢日未有可對照資料。")
+
+with tab8:
+    st.caption("春江鴨＝爆量上榜 ＋ 貨源異動證據（上榜日 ±5 日有券商射倉；CCASS Top10 待 M7 上游通後自動補）。只列旗標，唔構成投資建議。")
+    duck_files = sorted((DATA_DIR / "reports").glob("spring_duck_*.csv"), reverse=True)
+    if not duck_files:
+        st.info("未有報表。跑：`python scripts/spring_duck.py`")
+    else:
+        ddf = read_csv_if_exists(duck_files[0])
+        flagged = ddf[ddf["spring_duck_flag"] == 1] if not ddf.empty else ddf
+        st.caption(f"{duck_files[0].name}　flag=1 共 {len(flagged)}/{len(ddf)} 行")
+        if not flagged.empty:
+            pick_day = st.selectbox("揀日期", sorted(flagged["scan_date"].unique(), reverse=True),
+                                    key="duck_day")
+            st.dataframe(flagged[flagged["scan_date"] == pick_day],
+                         use_container_width=True, hide_index=True)
+
+with tab9:
+    st.caption("L 型候選＝過去 180 日有 GO／換主，之後未見配股供股（等表演）。只列旗標，唔構成投資建議。")
+    l_files = sorted((DATA_DIR / "reports").glob("l_shape_candidates_*.csv"), reverse=True)
+    if not l_files:
+        st.info("未有報表。跑：`python scripts/l_shape.py`")
+    else:
+        ldf = read_csv_if_exists(l_files[0])
+        if ldf.empty:
+            st.write("無紀錄")
+        else:
+            stage = st.selectbox("篩 stage", ["全部", "GO_等表演", "GO_已配供"], key="l_stage")
+            show = ldf if stage == "全部" else ldf[ldf["l_shape_stage"] == stage]
+            st.caption(f"{l_files[0].name}　{len(show)}/{len(ldf)} 隻")
+            st.dataframe(show, use_container_width=True, hide_index=True)
 
 if UNIVERSE_CSV.exists():
     uni = read_csv_if_exists(UNIVERSE_CSV)

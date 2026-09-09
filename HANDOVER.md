@@ -322,3 +322,33 @@ pytest -q                                      # 49 tests 全綠
   呢個基準定義下見唔到 alpha（基準限定成交 ≥1M 活躍股，同舊研究 0.5% 口徑唔同；只記數字）（`e01537d`）
 - A2 🔶 代碼 100%，等上面兩個 Turso env
 - B1/B2/B3 見 §16
+
+
+## 16. 第五階段 B 系＋收尾（zcode，2026-09-09 深夜）
+
+| 任務 | 狀態 | 摘要 |
+|---|---|---|
+| F1 | ✅ | workflow `git pull --rebase`＋§5 陷阱 #11 |
+| F2 | ✅ | M3 對照重做：04 100%／05 91.9%／06 83%／07 91.3%（§11 覆寫） |
+| F3 | ✅ | M4 去重＋baseline_all（§11 M4 表重寫；signal GO 3.26% vs 全體基準 3.40%，基準口徑注意） |
+| A2 | 🔶 代碼 100% | Turso state/alerts/heartbeat＋render.yaml＋tab2 Turso 優先——**等 KL 貼 TURSO_ 兩個 env**（清單 §14），貼完即著 |
+| B1 春江鴨 | ✅ | `scripts/spring_duck.py` → tab8；broker 數據只到 08-05，CCASS Top10 待 M7 上游 |
+| B2 L 型 | ✅ | `scripts/l_shape.py` → tab9；L 型研究 xlsx 未放 data/raw，純 events.db 版（7 隻 GO_等表演） |
+| B3 brief | ✅ | `scripts/morning_brief.py` → `data/reports/morning_brief_*.md`，已加落 Actions（M4 之後） |
+
+### KL 要貼嘅 Render env（重申，A2 用）
+`LONGBRIDGE_APP_KEY`／`LONGBRIDGE_APP_SECRET`／`LONGBRIDGE_ACCESS_TOKEN`／
+`TURSO_DATABASE_URL`／`TURSO_AUTH_TOKEN`（值同 .env／Turso dashboard；本機 .env 建議都加 TURSO_ 兩行）。
+
+### 下手要做重排（§6 更新）
+1. Render Blueprint 部署 `stockscan-intraday` cron（render.yaml 已喺 repo root）＋貼 5 個 env → 觀察 Turso 有冇雲端 alert
+2. CCASS：Render 部署 ccass-tool（`50a1290`）＋貼 `CCASS_API_URL`／`CCASS_API_KEY` 喺 STOCKSCAN .env → `python scripts/run_ccass.py` 終測 `?light=1`
+3. L 型研究 3 個 xlsx 放 `data/raw/` → B2 加交叉驗證
+4. 舊 3 個券商射倉 xlsx 放 `data/raw/` → M5 補入
+5. Actions log 檢查 09-08/09 失敗原因（zcode 冇權限，KL 貼 log）
+6. 觀察一周：A 榜 vs RTSS 每日 diff（tab7）、daemon vs 雲 cron 表現
+
+## 17. 第五階段之後（第六階段候選）
+
+Telegram 推送真開；「當日第 N 次」前瞻力用自家＋RTSS 對照數據驗證（等 T 部分儲夠 20 交易日）；
+人物網絡自動連結；完整 Round 4 五訊號 morning brief。

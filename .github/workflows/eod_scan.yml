@@ -62,6 +62,9 @@ jobs:
       - name: Report event timing (M4)
         run: python scripts/report_go_timing.py
 
+      - name: Morning brief (P5 B3)
+        run: python scripts/morning_brief.py
+
       - name: Fetch CCASS (M7, when secrets are configured)
         env:
           CCASS_API_URL: ${{ secrets.CCASS_API_URL }}
