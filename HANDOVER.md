@@ -269,3 +269,5 @@ pytest -q                                      # 49 tests 全綠
 - T2：新增 `stockscan/rtss_parser.py::parse_alert`，支援代號、名稱、市值／成交額單位換算、升幅、最新價、時間、當日次數及 level range；失敗保留 `raw_text` 並標 `parse_failed=1`。01536 真樣本測試通過；全套 **56 passed**。
 - T2 remote commit：`f6c7744`。
 - T3：新增 `scripts/build_rtss_alerts.py`，將 raw DOM JSONL 轉 `data/rtss/rtss_alerts_YYYYMMDD.csv`；同 code5+time upsert，raw／parse failure 均保留；支援 HKT `--date` 及 `--backfill --from/--to`。輸出目錄 gitignored，不 push。
+- T3 remote commit：`c87216e`。
+- T4：新增 `scripts/compare_rtss_daily.py`，按 code5 輸出 `both`／`rtss_only`／`stockscan_only`，RTSS-only 只記可觀察的市值／成交額門檻及「daemon_or_definition_difference」可能原因，不落結論；diff report 留作可公開統計。
