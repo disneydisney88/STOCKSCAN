@@ -74,19 +74,34 @@ def baseline_for_day(day: date, panel_codes: set[str], candidate_index: dict[str
 def build(panel_path: Path = DATA_DIR / "eod" / "radar_eod_panel_full.csv",
           db_path: Path = DATA_DIR / "events.db", seed: int = 20260908) -> pd.DataFrame:
     panel = pd.read_csv(panel_path, dtype={"scan_date": str, "code5": str})
+    panel["code5"] = panel["code5"].astype(str).str.zfill(5)
     universe = pd.read_csv(DATA_DIR / "universe.csv", dtype={"code5": str})
     events = load_events(db_path)
     candidate_index = build_candidate_index(DATA_DIR / "cache" / "daily", universe)
     rng = random.Random(seed)
     rows = []
+    # P5 F3：上榜組按 code5 去重——08368 上榜 18 次 = 1 個觀察（窗口由首次上榜日起計）
+    first_panel_day = panel.groupby("code5")["scan_date"].min()
+    for code, day_text in first_panel_day.items():
+        rows.append({"group": "signal", "code5": code, "scan_date": day_text,
+                     **event_flags(events, code, date.fromisoformat(day_text))})
+    # baseline_sample：原版每日抽 10 隻（保留做連續性對照）
+    panel_codes_all = set(first_panel_day.index)
     for day_text, day_df in panel.groupby("scan_date", sort=True):
         day = date.fromisoformat(day_text)
         signal_codes = set(day_df["code5"].astype(str).str.zfill(5))
-        observations = [("signal", c) for c in sorted(signal_codes)]
-        observations += [("baseline", c) for c in baseline_for_day(
-            day, signal_codes, candidate_index, rng)]
-        for group, code in observations:
-            rows.append({"group": group, "code5": code, "scan_date": day_text,
+        for code in baseline_for_day(day, signal_codes, candidate_index, rng):
+            rows.append({"group": "baseline_sample", "code5": code, "scan_date": day_text,
+                         **event_flags(events, code, day)})
+    # baseline_all：全體 <10 億（成交 ≥1M）、從未上榜——每隻一個觀察（首個合資格日）
+    seen: dict[str, str] = {}
+    for day_text in sorted(candidate_index):
+        day = date.fromisoformat(day_text)
+        for code in candidate_index[day_text]:
+            if code in panel_codes_all or code in seen:
+                continue
+            seen[code] = day_text
+            rows.append({"group": "baseline_all", "code5": code, "scan_date": day_text,
                          **event_flags(events, code, day)})
     return pd.DataFrame(rows)
 
