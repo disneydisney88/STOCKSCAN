@@ -47,9 +47,9 @@ def data_asof(df: pd.DataFrame) -> str:
     return str(df["scan_time"].dropna().max())[:16]
 
 
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
     ["📊 收市爆量榜（訊號A）", "⚡ 即市掃描（訊號B）", "🔬 對照 RTSS", "🗂 歷史面板", "📈 事件率",
-     "🔎 個股研究"])
+     "🔎 個股研究", "9️⃣ RTSS 對照"])
 
 with tab1:
     files = [f for f in eod_files() if f.name not in {"radar_eod_panel.csv", "radar_eod_panel_full.csv"}]
@@ -302,6 +302,42 @@ with tab6:
                          use_container_width=True, hide_index=True)
         else:
             st.write("無紀錄")
+
+with tab7:
+    st.caption("逐日 RTSS 純文字 alert 對照 STOCKSCAN 即市 alert；原始 RTSS 文字不會上載或顯示。")
+    diff_files = sorted((DATA_DIR / "reports").glob("rtss_daily_diff_*.csv"), reverse=True)
+    if not diff_files:
+        st.info("未有逐日 diff。先跑 `python scripts/compare_rtss_daily.py --date YYYY-MM-DD`。")
+    else:
+        diff_dates = {f: f.stem.replace("rtss_daily_diff_", "") for f in diff_files}
+        pick_diff = st.selectbox("揀日期", diff_files, format_func=lambda f: diff_dates[f])
+        ddf = read_csv_if_exists(pick_diff)
+        counts = ddf["group"].value_counts() if not ddf.empty and "group" in ddf.columns else pd.Series(dtype=int)
+        c1, c2, c3 = st.columns(3)
+        c1.metric("兩邊都有", int(counts.get("both", 0)))
+        c2.metric("RTSS 有／我哋冇", int(counts.get("rtss_only", 0)))
+        c3.metric("我哋有／RTSS 冇", int(counts.get("stockscan_only", 0)))
+        if not ddf.empty:
+            trend_rows = []
+            for f in diff_files:
+                t = read_csv_if_exists(f)
+                vc = t["group"].value_counts() if not t.empty and "group" in t.columns else pd.Series(dtype=int)
+                trend_rows.append({
+                    "date": diff_dates[f],
+                    "both": int(vc.get("both", 0)),
+                    "rtss_only": int(vc.get("rtss_only", 0)),
+                    "stockscan_only": int(vc.get("stockscan_only", 0)),
+                })
+            st.subheader("逐日 diff 趨勢")
+            trend = pd.DataFrame(trend_rows).sort_values("date").set_index("date")
+            st.line_chart(trend, height=220)
+            for group, title in (("both", "兩邊都有"), ("rtss_only", "RTSS 有／我哋冇"),
+                                 ("stockscan_only", "我哋有／RTSS 冇")):
+                st.subheader(title)
+                part = ddf[ddf["group"] == group]
+                st.dataframe(part, use_container_width=True, height=800, hide_index=True)
+        else:
+            st.info("呢日未有可對照資料。")
 
 if UNIVERSE_CSV.exists():
     uni = read_csv_if_exists(UNIVERSE_CSV)
