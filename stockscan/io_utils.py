@@ -107,6 +107,9 @@ def state_path(d: date) -> Path:
 
 
 def load_state(d: date) -> dict:
+    from stockscan import turso_state
+    if turso_state.configured():
+        return turso_state.load(d)
     p = state_path(d)
     if p.exists():
         with open(p, encoding="utf-8") as f:
@@ -115,6 +118,10 @@ def load_state(d: date) -> dict:
 
 
 def save_state(d: date, state: dict) -> Path:
+    from stockscan import turso_state
+    if turso_state.configured():
+        turso_state.save(d, state)
+        return state_path(d)
     ensure_dirs()
     p = state_path(d)
     with open(p, "w", encoding="utf-8") as f:
