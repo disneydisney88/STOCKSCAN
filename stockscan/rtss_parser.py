@@ -13,7 +13,11 @@ _LEVEL_RE = re.compile(r"[+-]?\d+(?:\.\d+)?%\s*[→➜\-]\s*[+-]?\d+(?:\.\d+)?%"
 
 
 def _field_number(text: str, label: str) -> float | None:
-    match = re.search(rf"{re.escape(label)}\s*[:：]\s*([^\n\r]+)", text, re.I)
+    match = re.search(
+        rf"{re.escape(label)}\s*[:：]\s*([+-]?\d[\d,]*(?:\.\d+)?\s*(?:兆|億|亿|千萬|千万|萬|万)?)",
+        text,
+        re.I,
+    )
     return parse_cn_number(match.group(1).strip()) if match else None
 
 

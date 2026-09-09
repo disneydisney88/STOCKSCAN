@@ -31,3 +31,11 @@ def test_parse_failure_keeps_raw_text_without_raising():
     got = parse_alert("RTSS message without structured fields")
     assert got["parse_failed"] == 1
     assert got["raw_text"].startswith("RTSS message")
+
+
+def test_parse_single_line_alert():
+    got = parse_alert("3億以下急升異動 [當日第1次] 煜榮集團 (HK.01536) 市值: 2.55億 成交額: 590.25萬 升幅: +23.08% 最新價: 0.560 15:26:31")
+    assert got["code5"] == "01536"
+    assert got["mcap"] == approx(255_000_000)
+    assert got["turnover"] == approx(5_902_500)
+    assert got["parse_failed"] == 0
