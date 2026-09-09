@@ -1,5 +1,7 @@
 # secrets — 唔准 commit
 .env
+.stockscan/
+credentials*
 .streamlit/secrets.toml
 
 # 執行狀態同 log
