@@ -31,6 +31,23 @@ jobs:
         run: |
           if [ ! -f data/universe.csv ]; then python -m stockscan.universe; fi
 
+      - name: Verify Longbridge secret presence
+        env:
+          LONGPORT_APP_KEY: ${{ secrets.LONGPORT_APP_KEY || secrets.LONGBRIDGE_APP_KEY }}
+          LONGPORT_APP_SECRET: ${{ secrets.LONGPORT_APP_SECRET || secrets.LONGBRIDGE_APP_SECRET }}
+          LONGPORT_ACCESS_TOKEN: ${{ secrets.LONGPORT_ACCESS_TOKEN || secrets.LONGBRIDGE_ACCESS_TOKEN }}
+        run: |
+          missing=0
+          for name in LONGPORT_APP_KEY LONGPORT_APP_SECRET LONGPORT_ACCESS_TOKEN; do
+            if [ -n "${!name}" ]; then
+              echo "$name present"
+            else
+              echo "$name missing"
+              missing=1
+            fi
+          done
+          test "$missing" -eq 0
+
       - name: Run EOD scan (訊號 A)
         env:
           LONGPORT_APP_KEY: ${{ secrets.LONGPORT_APP_KEY || secrets.LONGBRIDGE_APP_KEY }}
