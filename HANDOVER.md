@@ -257,3 +257,11 @@ pytest -q                                      # 49 tests 全綠
 1. **mcap_unreliable：4,006/4,036 行（99.3%）**——13 個月面板幾乎全部行嘅市值係用「今日股數 × 歷史價」近似（Codex 價格庫 X0 冇歷史股數）。按月 98.2%–100%。**研究含歷史 mcap 嘅結論前必須記住呢點**；上榜名單本身（價量口徑）唔受影響。
 2. 種子 08-31 市值 vs 面板 2026-08-31 mcap_total：可比 21 隻中 **2 隻差 >30%**——00913 港灣數字 +162%（疑似合股/拆股）、00021 大中華控股 +31%（股數口徑/攤薄）。明細 `data/reports/data_quality_audit_20260909.csv`。
 3. 09-08 即市 alert：25 條（VOLUME 18/SURGE 7）；corp_action_suspect=0、resumption_suspect=0、**price_gap_suspect=2**（全部係 02738 華津國際控股 SURGE+VOLUME，+830%/1506x，合股假訊號已正確標記）。
+
+## 15. T1 RTSS CDP 文字抓取（2026-09-09）
+
+- 狀態：✅ CDP 連接成功；`http://127.0.0.1:9222` 有 RTSS page（channel `-2795969450`），只讀 `.message` DOM 及 `.time-inner` 日期，不 click、不 focus、不截圖、不讀 media。
+- 新增：`scripts/fetch_rtss_cdp.py`；raw staging 寫 `data/rtss/raw_dom_YYYYMMDD.jsonl`，目錄已加入 `.gitignore`，不 push。
+- 參數：預設及 `--date` 用 `today_hkt()`／指定 HKT 日期；支援 `--backfill --from YYYY-MM-DD --to YYYY-MM-DD`，逐日 upsert raw DOM text。
+- 驗證：`python scripts/fetch_rtss_cdp.py --date 2026-09-08` 成功連接及完成，當時 DOM 未載入目標日期 alert，輸出 0 條並發 warning，無 crash；目前可見 DOM 日期為 2026-07-30 至 2026-07-31，需 T2/T5 以現有歷史文字檔繼續驗證 parser。
+- 基線：`python -m pytest -q --basetemp .pytest-tmp-baseline` → **54 passed**。
