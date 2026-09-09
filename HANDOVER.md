@@ -115,6 +115,8 @@ Streamlit：https://stockscan-emwmwndwrop2emavfyatme.streamlit.app（四 tab）
 9. **門檻只准改 `config.py`**，改完寫 HANDOVER。對照失手唔准夾數——先記錄差異再查口徑。
 10. **呢单機嘅時鐘係 GMT**；「今日」錯一日就會寫錯檔名——一律 `today_hkt()`。
 
+11. **Actions rerun 陷阱**：只 rerun 最新 commit；workflow 已加 `git pull --rebase origin main`（F1）。
+
 ## 6. 點樣重跑（三行＋測試）
 
 ```bash
