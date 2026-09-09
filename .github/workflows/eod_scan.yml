@@ -77,6 +77,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # P5 F1：rerun 舊 commit 會 non-fast-forward——push 前先 rebase 上最新 main
+          git pull --rebase origin main
           git add data/eod data/reports data/universe.csv
           git diff --cached --quiet || git commit -m "EOD scan $(date -u '+%F_%H:%M UTC')"
           git push
