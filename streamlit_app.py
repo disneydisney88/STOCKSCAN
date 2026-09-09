@@ -100,15 +100,30 @@ with tab2:
                 "Streamlit Cloud 請喺 App → Settings → Secrets 填（LONGBRIDGE_ 或 LONGPORT_ 前綴都得）：\n\n"
                 "```toml\nLONGBRIDGE_APP_KEY = \"…\"\nLONGBRIDGE_APP_SECRET = \"…\"\n"
                 "LONGBRIDGE_ACCESS_TOKEN = \"…\"\n```")
+    # A2.3：優先讀 Turso（雲 Cron＋本機 daemon 嘅單一真相），讀唔到 fallback 本機 CSV
+    adf = None
+    try:
+        from stockscan import turso_state
+
+        if turso_state.configured():
+            adf = turso_state.recent_alerts(days=3, limit=500)
+            if adf is not None and not adf.empty:
+                st.subheader("最近 alert——來源：Turso（雲＋本機，最近 3 日）")
+                st.caption("數據截至：" + str(adf["ts"].dropna().max()))
+                st.table(adf.style.hide(axis="index"))
+    except Exception as e:  # noqa: BLE001——Turso 抽風 fallback 本機
+        st.caption(f"Turso 讀取失敗，改用本機 CSV（{e!r}）")
     alert_files = sorted(INTRADAY_DIR.glob("alerts_*.csv"), reverse=True)
-    if alert_files:
-        st.subheader(f"最近 alert（{alert_files[0].name}）——唯讀")
-        adf = read_csv_if_exists(alert_files[0])
-        if not adf.empty:
-            st.caption("數據截至：" + str(adf["ts"].dropna().max()))
-            st.table(adf.sort_values("ts", ascending=False).style.hide(axis="index"))
-    else:
-        st.info("未有 alerts_*.csv。本機跑 `python scripts/run_intraday.py --once`。")
+    if adf is None or adf.empty:
+        if alert_files:
+            st.subheader(f"最近 alert（{alert_files[0].name}）——唯讀（本機 CSV fallback）")
+            adf = read_csv_if_exists(alert_files[0])
+            if not adf.empty:
+                st.caption("數據截至：" + str(adf["ts"].dropna().max()))
+                st.table(adf.sort_values("ts", ascending=False).style.hide(axis="index"))
+        else:
+            st.info("未有 alerts。本機跑 `python scripts/run_intraday.py --once`，"
+                    "或者 Render Cron 起好之後自動有。")
 
     # ── P4 Z1b：時點快照 ──
     snap_files = sorted(INTRADAY_DIR.glob("snapshot_*.csv"), reverse=True)

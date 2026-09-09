@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from config import INTRA_POLL_SEC, DISCLAIMER
 from stockscan.calendar_hk import in_scan_session
-from stockscan.io_utils import today_hkt
+from stockscan.io_utils import HKT, today_hkt
 from stockscan.lb_client import LB, MissingCredentialsError
 from stockscan.scan_intraday import scan_once
 
@@ -35,14 +35,30 @@ def main() -> int:
     ap.add_argument("--loop", type=int, default=0,
                     help=f"每隔 N 秒一輪（0=只跑一次；建議 {INTRA_POLL_SEC}）")
     ap.add_argument("--once", action="store_true", help="只跑一輪（同 --loop 0）")
+    ap.add_argument("--source", choices=["local", "cloud"], default=None,
+                    help="local=本機 daemon；cloud=Render Cron（要有 TURSO_* env）")
     args = ap.parse_args()
     loop = args.loop if args.loop else 0
+    if args.source:
+        os.environ["INTRADAY_SOURCE"] = args.source
+    if args.source == "cloud":
+        from stockscan import turso_state
+
+        if not turso_state.configured():
+            print("[run_intraday] cloud 模式需要 TURSO_DATABASE_URL／TURSO_AUTH_TOKEN。",
+                file=sys.stderr)
+            return 2
 
     try:
         lb = LB()
     except MissingCredentialsError as e:
         print(f"[run_intraday] {e}", file=sys.stderr)
         return 2
+
+    if args.once and not in_scan_session():
+        now = datetime.now(ZoneInfo("Asia/Hong_Kong"))
+        print(f"[run_intraday] {now:%H:%M} HKT 非掃描時段（cron 模式秒退）。")
+        return 0
 
     while True:
         if loop and not in_scan_session():

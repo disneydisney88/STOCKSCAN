@@ -14,6 +14,7 @@ ma10 由 P1 日線快取取（嚴格取 scan 日之前 10 個交易日，收市�
 from __future__ import annotations
 
 import math
+import os
 import time
 from datetime import date
 
@@ -31,7 +32,7 @@ from config import (
     MCAP_CAP_INTRA,
     UNIVERSE_CSV,
 )
-from stockscan import kline_cache
+from stockscan import kline_cache, turso_state
 from stockscan.calendar_hk import in_scan_session
 from stockscan.events import action_prev_close, corporate_action_on
 from stockscan.io_utils import (
@@ -108,6 +109,22 @@ def scan_once(lb, scan_date: date | None = None) -> tuple[pd.DataFrame, pd.DataF
     ensure_dirs()
     t0 = time.perf_counter()
     d = scan_date or now_hkt().date()
+    source = os.environ.get("INTRADAY_SOURCE", "local")
+
+    # A2.4 去重：Turso 顯示另一邊（雲 Cron／本機 daemon）5 分鐘內掃過 → 跳過呢輪
+    if turso_state.configured():
+        try:
+            mins = turso_state.other_source_minutes_ago(source)
+            if mins is not None and mins < 5:
+                meta = {"skipped": f"另一 source {mins:.1f} 分鐘前掃過", "quoted": 0,
+                        "pool": 0, "alerts": 0, "off_hours": 1, "ma10_errors": 0,
+                        "elapsed_s": 0.0, "scan_time": ts_hkt(),
+                        "_pool": {}, "_shares": {}, "_names": {}}
+                _log_intraday_stats(meta)
+                return (pd.DataFrame(columns=ALERT_COLUMNS),
+                        pd.DataFrame(), meta)
+        except Exception as e:  # noqa: BLE001——Turso 抽風唔可以搞冧掃描
+            log_error("turso.dedupe", repr(e))
     uni = _load_universe()
     shares = dict(zip(uni["symbol_lb"], uni["total_shares"]))
     names = dict(zip(uni["symbol_lb"], uni["name_hk"].fillna(uni["name_seed"])))
@@ -149,6 +166,13 @@ def scan_once(lb, scan_date: date | None = None) -> tuple[pd.DataFrame, pd.DataF
             log_error("scan_intraday.resumption", f"{sym}: {e!r}")
 
     state = load_state(d)
+    if turso_state.configured():
+        try:  # A2.1：Turso 係單一真相；本機 JSON 有而雲端冇嘅 key 都保留
+            remote = turso_state.load(d)
+            for sym, st in remote.items():
+                state[sym] = {**state.get(sym, {}), **st}
+        except Exception as e:  # noqa: BLE001
+            log_error("turso.load", repr(e))
     off_hours = 0 if in_scan_session() else 1
     alerts: list[dict] = []
     ma10_errors = 0
@@ -194,6 +218,13 @@ def scan_once(lb, scan_date: date | None = None) -> tuple[pd.DataFrame, pd.DataF
             st.setdefault("first_seen_ts", a["ts"])
         save_state(d, state)
         append_csv(pd.DataFrame(alerts, columns=ALERT_COLUMNS), _alerts_path(d))
+        if turso_state.configured():
+            try:  # A2.1/A2.4：state＋alerts 鏡像上 Turso，本機雲端單一真相
+                turso_state.save(d, state)
+                turso_state.append_alerts(d, alerts.to_dict("records"), source)
+                turso_state.touch_heartbeat(source)
+            except Exception as e:  # noqa: BLE001
+                log_error("turso.save", repr(e))
 
     near = pd.DataFrame([
         {"code5": lb_to_code5(s), "name": names.get(s, s),

@@ -6,13 +6,15 @@ services:
     region: singapore
     buildCommand: pip install -r requirements.txt
     schedule: "*/5 * * * *"
-    startCommand: python scripts/run_intraday.py --once
+    startCommand: python scripts/run_intraday.py --once --source cloud
     envVars:
-      - key: LONGPORT_APP_KEY
+      - key: INTRADAY_SOURCE
+        value: cloud
+      - key: LONGBRIDGE_APP_KEY
         sync: false
-      - key: LONGPORT_APP_SECRET
+      - key: LONGBRIDGE_APP_SECRET
         sync: false
-      - key: LONGPORT_ACCESS_TOKEN
+      - key: LONGBRIDGE_ACCESS_TOKEN
         sync: false
       - key: TURSO_DATABASE_URL
         sync: false

@@ -280,3 +280,45 @@ pytest -q                                      # 49 tests 全綠
 - T5 parser 修正：兼容 TGWebExporter「一行一條 alert」格式，label 後按數字＋單位擷取，不把後續欄位誤併入市值／成交額。
 - T5 remote commit：`22a60b8`。
 - T6：Streamlit 新增標示「9️⃣ RTSS 對照」tab，逐日讀 diff report，顯示 both／rtss_only／stockscan_only 指標、趨勢及分組明細；不讀取 RTSS 圖片或 raw text。
+
+
+## 14. 第五階段 A2：即市上雲（zcode，2026-09-09 深夜）——等 KL 貼 env 即著
+
+代碼全部落地（`stockscan/turso_state.py`＋`scan_intraday` 接駁＋`render.yaml`），
+**唯一欠係 Turso 憑證**：`%USERPROFILE%\.stockscan\.env` 同 Render 都未有
+`TURSO_DATABASE_URL`／`TURSO_AUTH_TOKEN`（Codex 第三階段合併 .env 時刪咗原始檔，呢組數字 lost）。
+
+### KL 要貼嘅 Render env 清單（Render → Blueprint 部署後逐個貼，或者 Blueprint 過程貼）
+
+| Key | Value |
+|---|---|
+| `LONGBRIDGE_APP_KEY` | 同 .env |
+| `LONGBRIDGE_APP_SECRET` | 同 .env |
+| `LONGBRIDGE_ACCESS_TOKEN` | 同 .env |
+| `TURSO_DATABASE_URL` | `libsql://…`（Turso dashboard → 你個 DB → URL） |
+| `TURSO_AUTH_TOKEN` | Turso dashboard → Tokens 生成 |
+| （選）`INTRADAY_SOURCE` | `cloud`（render.yaml 已預設） |
+
+同時建議本機 `%USERPROFILE%\.stockscan\.env` 都加埋 `TURSO_DATABASE_URL`／`TURSO_AUTH_TOKEN`
+兩行——本機 daemon 就會自動同雲共享 state＋互相去重。
+
+### 運作設計
+
+- Cron `*/5 * * * *` UTC；`run_intraday --once --source cloud` 喺 HKT 非交易時段秒退（唔使 API）
+- state 單一真相＝Turso（`intraday_state` 表，(trade_date, symbol) PK，state_json 整份存）；
+  本機 JSON 照寫做 fallback
+- alerts 鏡像上 `intraday_alerts` 表（PK ts+date+code5+alert_type 天然去重）；
+  tab2 優先讀 Turso（Cloud 版都睇到），fallback 本機 CSV
+- A2.4 去重：`scan_heartbeat` 表——另一 source 5 分鐘內掃過就 skip 呢輪（本機 daemon 同雲 Cron
+  唔會重複 alert）。**建議：Render Cron 部署成功之後，本機 daemon 可以 disable**：
+  `schtasks /change /tn STOCKSCAN_intraday /disable`
+- 所有 Turso 出錯都只會 log＋fallback 本機，唔會搞冧掃描
+
+## 15. 第五階段其餘狀態
+
+- F1 ✅ workflow `git pull --rebase`（`7f3e854`）＋§5 陷阱 #11（`4b9f908`）
+- F2 ✅ M3 對照重做：04 100%／05 91.9%／06 83%／07 91.3%（`dc204c5`+`f8bef43`）——舊表作廢
+- F3 ✅ M4 GO 報時去重＋baseline_all：signal（去重）GO 180d 3.26% vs 全體基準 3.40%——
+  呢個基準定義下見唔到 alpha（基準限定成交 ≥1M 活躍股，同舊研究 0.5% 口徑唔同；只記數字）（`e01537d`）
+- A2 🔶 代碼 100%，等上面兩個 Turso env
+- B1/B2/B3 見 §16
