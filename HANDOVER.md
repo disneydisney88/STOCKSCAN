@@ -265,3 +265,5 @@ pytest -q                                      # 49 tests 全綠
 - 參數：預設及 `--date` 用 `today_hkt()`／指定 HKT 日期；支援 `--backfill --from YYYY-MM-DD --to YYYY-MM-DD`，逐日 upsert raw DOM text。
 - 驗證：`python scripts/fetch_rtss_cdp.py --date 2026-09-08` 成功連接及完成，當時 DOM 未載入目標日期 alert，輸出 0 條並發 warning，無 crash；目前可見 DOM 日期為 2026-07-30 至 2026-07-31，需 T2/T5 以現有歷史文字檔繼續驗證 parser。
 - 基線：`python -m pytest -q --basetemp .pytest-tmp-baseline` → **54 passed**。
+- T1 remote commit：`d089eed`（乾淨 clone apply；Drive `.git` 偽 `desktop.ini` ref 令本機 fetch 不穩）。
+- T2：新增 `stockscan/rtss_parser.py::parse_alert`，支援代號、名稱、市值／成交額單位換算、升幅、最新價、時間、當日次數及 level range；失敗保留 `raw_text` 並標 `parse_failed=1`。01536 真樣本測試通過；全套 **56 passed**。
