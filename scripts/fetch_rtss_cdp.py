@@ -23,15 +23,43 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from stockscan.io_utils import now_hkt, today_hkt
 
 CDP_URL = "http://127.0.0.1:9222"
-RTSS_FRAGMENT = "-2795969450"
+# Telegram Web uses the -100 prefix for channel peer IDs; older exports omit it.
+# Match the stable numeric channel ID in either URL form.
+RTSS_FRAGMENT = "2795969450"
 OUT_DIR = Path("data/rtss")
 TITLE_DATE_RE = re.compile(r"^(\d{1,2} [A-Za-z]+ \d{4}),")
+TIME_RE = re.compile(r"\b(\d{1,2}:\d{2}:\d{2})\b")
 
 
 def _date_from_title(title: str) -> date | None:
     match = TITLE_DATE_RE.search(title or "")
     if not match:
         return None
+
+
+def _date_from_label(label: str) -> date | None:
+    label = " ".join(str(label or "").split())
+    if label.lower() == "today":
+        return today_hkt()
+    if label.lower() == "yesterday":
+        return today_hkt() - timedelta(days=1)
+    weekdays = {datetime(2000, 1, 3).strftime("%A").lower(): 0}
+    weekdays.update({(datetime(2000, 1, 3) + timedelta(days=i)).strftime("%A").lower(): i
+                     for i in range(7)})
+    if label.lower() in weekdays:
+        today = today_hkt()
+        for delta in range(7):
+            candidate = today - timedelta(days=delta)
+            if candidate.strftime("%A").lower() == label.lower():
+                return candidate
+    for fmt in ("%Y-%m-%d", "%B %d", "%b %d"):
+        try:
+            parsed = datetime.strptime(label, fmt).date() if fmt == "%Y-%m-%d" else \
+                datetime.strptime(f"{today_hkt().year} {label}", f"%Y {fmt}").date()
+            return parsed if fmt == "%Y-%m-%d" else parsed.replace(year=today_hkt().year)
+        except ValueError:
+            continue
+    return None
     try:
         return datetime.strptime(match.group(1), "%d %B %Y").date()
     except ValueError:
@@ -40,21 +68,24 @@ def _date_from_title(title: str) -> date | None:
 
 def _message_rows(page) -> list[dict]:
     """Read message text/title only; no DOM action which changes Telegram state."""
-    return page.locator(".message").evaluate_all(
+    return page.locator(".message, .Message").evaluate_all(
         """els => els.map((el, index) => {
           const textEl = el.querySelector('.translatable-message, .text-content');
-          const timeEl = el.querySelector('.time-inner, .time');
+          const timeEl = el.querySelector('.time-inner, .time, .message-time');
+          const dateEl = el.closest('.message-date-group')?.querySelector('.sticky-date');
           return {
             ordinal: index,
             raw_text: (textEl || el).innerText || (textEl || el).textContent || '',
-            dom_title: timeEl ? (timeEl.getAttribute('title') || '') : ''
+            dom_title: timeEl ? (timeEl.getAttribute('title') || '') : '',
+            date_label: dateEl ? (dateEl.innerText || dateEl.textContent || '') : '',
+            dom_message_id: el.getAttribute('data-message-id') || ''
           };
         })"""
     )
 
 
 def _scrollable(page):
-    loc = page.locator(".bubbles-scrollable").first
+    loc = page.locator(".bubbles-scrollable, .MessageList.custom-scroll, .Transition.MessageList").first
     if loc.count():
         return loc
     return page.locator(
@@ -80,7 +111,7 @@ def collect_rows(page, start: date, end: date) -> list[dict]:
         dates_seen: list[date] = []
         for row in rows:
             title = str(row.get("dom_title") or "")
-            msg_date = _date_from_title(title)
+            msg_date = _date_from_title(title) or _date_from_label(str(row.get("date_label") or ""))
             if msg_date:
                 dates_seen.append(msg_date)
             text = " ".join(str(row.get("raw_text") or "").split())
@@ -157,6 +188,17 @@ def main() -> int:
             return 1
         page = candidates[0]
         rows = collect_rows(page, start, end)
+        alert_times = []
+        for row in rows:
+            try:
+                row_date = date.fromisoformat(str(row.get("message_date") or ""))
+            except ValueError:
+                row_date = _date_from_title(str(row.get("dom_title") or "")) or \
+                    _date_from_label(str(row.get("date_label") or ""))
+            time_match = TIME_RE.search(str(row.get("raw_text") or ""))
+            if row_date and time_match:
+                alert_times.append(f"{row_date.isoformat()} {time_match.group(1)}")
+        print(f"[rtss-cdp] raw_rows={len(rows)} latest_alert_ts={max(alert_times) if alert_times else '—'}")
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     by_day: dict[str, list[dict]] = {}

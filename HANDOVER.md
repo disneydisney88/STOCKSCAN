@@ -293,6 +293,9 @@ pytest -q                                      # 49 tests 全綠
 - 數據質量修復（2026-09-10）：`stockscan/rtss_parser.py` 加入新逐條 schema（`msg_id`／`alert_ts`／原文數值／級距拆欄／category），`(code5, alert_ts)` 去重；新增 `scripts/rebuild_rtss_schema.py`、逐股日彙總及 `.meta.json` 時間範圍。
 - 由 TGWebExporter SQLite 以 HKT 重建 2025-08-29 至 2026-09-10 共 **378** 個每日檔；來源實際涵蓋至 2026-08-28（`source range=2025-06-26..2026-08-28`），範圍後日期保留空 schema，唔虛構 alert。新 schema 重複鍵驗證 **0**。
 - 01536 pytest 兩條樣本驗證 `14:24:13`／`14:42:53` 分開，第二條 `count_today=2`、級距 `22→32`；全套 pytest **61 passed**。逐條／by-stock／metadata／diff 產物已重送固定 `RTSS_TG`（共 1513 檔）。
+- 09-10 空檔根因修復（2026-09-10）：Chrome 實際 RTSS URL 為 `https://web.telegram.org/a/#-1002795969450`，舊版只匹配 `-2795969450`；Telegram Web A DOM 亦由 `.message`／`.bubbles-scrollable` 改為 `.Message`／`.MessageList.custom-scroll`，日期改在 `.message-date-group .sticky-date`，時間改為 `.message-time`。`fetch_rtss_cdp.py` 已兼容兩種 channel ID、DOM selector 及 `Today`／`Yesterday`／星期日期（全用 HKT）。
+- 修復後實測：09-10 raw **17** 條，build 後 **7** 條可解析＋**1** 條 `parse_failed`，最新 alert_ts=`2026-09-10 14:33:21`；重建 `rtss_alerts_20260910.csv`／by-stock／metadata／diff。故 09-10 並非無 alert，而係抓取層漏資料。
+- Drive 唯一交收目標：`G:\我的雲端硬碟\RTSS\RTSS_TG`（folder ID `1H0I2YUQn1_JRN1O3zBZUepm88YAarKpx`）；全 Drive 盤點 09-10 檔只見於此夾，GUI／流程停止使用其他 parent 夾。
 
 
 ## 14. 第五階段 A2：即市上雲（zcode，2026-09-09 深夜）——等 KL 貼 env 即著
