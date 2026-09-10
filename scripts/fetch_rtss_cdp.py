@@ -21,6 +21,7 @@ from playwright.sync_api import sync_playwright
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from stockscan.io_utils import now_hkt, today_hkt
+from stockscan.rtss_parser import clean_alert_text
 
 CDP_URL = "http://127.0.0.1:9222"
 # Telegram Web uses the -100 prefix for channel peer IDs; older exports omit it.
@@ -71,6 +72,7 @@ def _message_rows(page) -> list[dict]:
     return page.locator(".message, .Message").evaluate_all(
         """els => els.map((el, index) => {
           const textEl = el.querySelector('.translatable-message, .text-content');
+          if (!textEl) return null;
           const timeEl = el.querySelector('.time-inner, .time, .message-time');
           const dateEl = el.closest('.message-date-group')?.querySelector('.sticky-date');
           return {
@@ -80,7 +82,7 @@ def _message_rows(page) -> list[dict]:
             date_label: dateEl ? (dateEl.innerText || dateEl.textContent || '') : '',
             dom_message_id: el.getAttribute('data-message-id') || ''
           };
-        })"""
+        }).filter(Boolean)"""
     )
 
 
@@ -114,7 +116,7 @@ def collect_rows(page, start: date, end: date) -> list[dict]:
             msg_date = _date_from_title(title) or _date_from_label(str(row.get("date_label") or ""))
             if msg_date:
                 dates_seen.append(msg_date)
-            text = " ".join(str(row.get("raw_text") or "").split())
+            text = clean_alert_text(str(row.get("raw_text") or ""))
             if not text:
                 continue
             key = hashlib.sha256(
@@ -212,7 +214,14 @@ def main() -> int:
             for line in path.read_text(encoding="utf-8").splitlines():
                 try:
                     item = json.loads(line)
-                    if item.get("message_key"):
+                    text = clean_alert_text(str(item.get("raw_text") or ""))
+                    # Keep only actual alert bubbles; old raw files may contain
+                    # Telegram view-count/local-time UI rows from before T1.
+                    if item.get("message_key") and text and re.search(r"\(\s*HK\.?\s*\d{1,5}\s*\)", text, re.I):
+                        item["raw_text"] = text
+                        item["message_key"] = hashlib.sha256(
+                            f"{item.get('dom_title', '')}\n{text}".encode("utf-8", errors="replace")
+                        ).hexdigest()
                         existing[item["message_key"]] = item
                 except json.JSONDecodeError:
                     print(f"[rtss-cdp] ignored malformed raw line: {path}", file=sys.stderr)

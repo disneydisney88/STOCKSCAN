@@ -33,6 +33,25 @@ def test_parse_failure_keeps_raw_text_without_raising():
     assert got["raw_text"].startswith("RTSS message")
 
 
+def test_name_and_raw_text_exclude_heading_and_telegram_chrome():
+    got = parse_alert(
+        "3億以下急升異動 [當日第1次] MI能源 (HK.01555) "
+        "市值: 1.25億 成交額: 107.83萬 升幅: +32.14% 最新價: 0.037 "
+        "09:48:37 相關範疇：港股細市值急升監控 77 02:48",
+        message_date="2026-09-10",
+    )
+    assert got["name"] == "MI能源"
+    assert got["alert_ts"] == "2026-09-10 09:48:37"
+    assert "02:48" not in got["raw_text"]
+    assert got["parse_failed"] == 0
+
+
+def test_telegram_ui_only_row_is_parse_failed_without_ui_tail():
+    got = parse_alert("77 04:31", message_date="2026-09-10")
+    assert got["parse_failed"] == 1
+    assert got["raw_text"] == ""
+
+
 def test_parse_single_line_alert():
     got = parse_alert("3億以下急升異動 [當日第1次] 煜榮集團 (HK.01536) 市值: 2.55億 成交額: 590.25萬 升幅: +23.08% 最新價: 0.560 15:26:31")
     assert got["code5"] == "01536"
