@@ -13,7 +13,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from stockscan.io_utils import today_hkt, write_csv
-from stockscan.rtss_parser import parse_alert
+from stockscan.rtss_parser import clean_alert_text, parse_alert
 
 RTSS_DIR = Path("data/rtss")
 COLUMNS = [
@@ -31,6 +31,9 @@ def build_day(day: date, raw_path: Path | None = None, out_path: Path | None = N
         try:
             old = pd.read_csv(out_path, dtype={"code5": str}, encoding="utf-8-sig")
             for row in old.to_dict("records"):
+                row["raw_text"] = clean_alert_text(str(row.get("raw_text") or ""))
+                if not row["raw_text"] or not str(row.get("code5") or "").strip():
+                    continue
                 key = f"{str(row.get('code5', '')).zfill(5)}|{row.get('alert_ts', '') or row.get('time', '')}"
                 records[key] = row
         except (OSError, ValueError) as exc:
