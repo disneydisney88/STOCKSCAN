@@ -28,7 +28,8 @@ RTSS_DIR = DATA_DIR / "rtss"
 REPORT_DIR = DATA_DIR / "reports"
 INTRADAY_DIR = DATA_DIR / "intraday"
 DEFAULT_EXPORTER = Path(r"C:\TGWebExporter\RTSS_Output\rtss_messages.sqlite")
-DEFAULT_DRIVE = Path(r"G:\我的雲端硬碟\STOCKSCAN_交收\rtss")
+DEFAULT_DRIVE = Path(r"G:\我的雲端硬碟\RTSS\RTSS_TG")
+DRIVE_FOLDER_ID = "1H0I2YUQn1_JRN1O3zBZUepm88YAarKpx"
 CDP_VERSION_URL = "http://127.0.0.1:9222/json/version"
 CDP_LIST_URL = "http://127.0.0.1:9222/json/list"
 
@@ -171,7 +172,7 @@ def show_summary(day: date) -> None:
     st.caption(f"alerts：{alerts}　|　diff：{diff}")
 
 
-def copy_to_drive(mode: str, day: date, destination: Path) -> list[Path]:
+def copy_to_drive(mode: str, day: date, destination: Path) -> tuple[list[Path], list[Path]]:
     if mode == "今日 diff CSV":
         files = [REPORT_DIR / f"rtss_daily_diff_{day:%Y%m%d}.csv"]
     elif mode == "指定日期 alerts CSV":
@@ -180,11 +181,15 @@ def copy_to_drive(mode: str, day: date, destination: Path) -> list[Path]:
         files = sorted(RTSS_DIR.glob("rtss_alerts_*.csv"))
     destination.mkdir(parents=True, exist_ok=True)
     copied: list[Path] = []
+    skipped: list[Path] = []
     for source in (path for path in files if path.exists()):
         target = destination / source.name
+        if target.exists():
+            skipped.append(target)
+            continue
         shutil.copy2(source, target)
         copied.append(target)
-    return copied
+    return copied, skipped
 
 
 def diff_dates() -> list[date]:
@@ -304,17 +309,19 @@ drive_col1, drive_col2, drive_button = st.columns([1, 2, 1])
 with drive_col1:
     drive_mode = st.selectbox("要送咩", ["今日 diff CSV", "指定日期 alerts CSV", "全部 rtss_alerts"])
 with drive_col2:
-    drive_path = st.text_input("交收夾", value=str(DEFAULT_DRIVE))
+    drive_path = st.text_input("固定交收夾", value=str(DEFAULT_DRIVE), disabled=True)
 with drive_button:
     st.write("")
     st.write("")
     drive_run = st.button("☁️ 送去 Drive")
 if drive_run:
     try:
-        copied = copy_to_drive(drive_mode, single_day, Path(drive_path))
+        copied, skipped = copy_to_drive(drive_mode, single_day, Path(drive_path))
         if copied:
-            st.success(f"已複製 {len(copied)} 檔到 {drive_path}")
-        else:
+            st.success(f"已新增 {len(copied)} 檔到 {drive_path}")
+        if skipped:
+            st.info(f"已跳過 {len(skipped)} 個同名檔（唔覆蓋既有交收檔）")
+        if not copied and not skipped:
             st.warning("未搵到符合條件嘅產物。")
     except OSError as exc:
         st.error(f"複製失敗：{exc}")

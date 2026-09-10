@@ -285,7 +285,8 @@ pytest -q                                      # 49 tests 全綠
 
 - 狀態：✅ 新增 `rtss_console.py` 及根目錄 `啟動RTSS.bat`。
 - GUI 只包住現有流程：`fetch_rtss_cdp.py` → `build_rtss_alerts.py` → `compare_rtss_daily.py`；歷史檔用現有 `import_rtss_backfill.py`，冇重寫抓取／parser 邏輯。
-- 功能：自動檢查 `127.0.0.1:9222` RTSS tab；CDP 未連時可啟動指定 Chrome profile；今日／單日／範圍抓取；TGWebExporter SQLite／CSV 匯入；複製產物到 `G:\我的雲端硬碟\STOCKSCAN_交收\rtss`；歷史 three-way diff 及 RTSS-only 趨勢。
+- 功能：自動檢查 `127.0.0.1:9222` RTSS tab；CDP 未連時可啟動指定 Chrome profile；今日／單日／範圍抓取；TGWebExporter SQLite／CSV 匯入；複製產物到固定 Drive 夾 `G:\我的雲端硬碟\RTSS\RTSS_TG`（folder ID：`1H0I2YUQn1_JRN1O3zBZUepm88YAarKpx`）；歷史 three-way diff 及 RTSS-only 趨勢。
+- Drive 交收檔名固定為 `rtss_alerts_YYYYMMDD.csv`／`rtss_daily_diff_YYYYMMDD.csv`；同日重跑遇到目標同名檔會跳過，不覆蓋既有檔案。
 - 安全口徑：GUI 只讀現有 script 產物及 exporter `message_text`；`data/rtss/` 繼續 gitignored，不納入 commit。
 - 啟動：雙擊 `啟動RTSS.bat`，或 `streamlit run rtss_console.py`。
 - 驗證：`python -m py_compile rtss_console.py` 通過；Streamlit 本機 8502 頁面成功載入；全套 **60 passed**。
