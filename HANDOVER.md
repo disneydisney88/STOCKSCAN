@@ -281,6 +281,15 @@ pytest -q                                      # 49 tests 全綠
 - T5 remote commit：`22a60b8`。
 - T6：Streamlit 新增標示「9️⃣ RTSS 對照」tab，逐日讀 diff report，顯示 both／rtss_only／stockscan_only 指標、趨勢及分組明細；不讀取 RTSS 圖片或 raw text。
 
+### 15.1 RTSS 本機 GUI（2026-09-10）
+
+- 狀態：✅ 新增 `rtss_console.py` 及根目錄 `啟動RTSS.bat`。
+- GUI 只包住現有流程：`fetch_rtss_cdp.py` → `build_rtss_alerts.py` → `compare_rtss_daily.py`；歷史檔用現有 `import_rtss_backfill.py`，冇重寫抓取／parser 邏輯。
+- 功能：自動檢查 `127.0.0.1:9222` RTSS tab；CDP 未連時可啟動指定 Chrome profile；今日／單日／範圍抓取；TGWebExporter SQLite／CSV 匯入；複製產物到 `G:\我的雲端硬碟\STOCKSCAN_交收\rtss`；歷史 three-way diff 及 RTSS-only 趨勢。
+- 安全口徑：GUI 只讀現有 script 產物及 exporter `message_text`；`data/rtss/` 繼續 gitignored，不納入 commit。
+- 啟動：雙擊 `啟動RTSS.bat`，或 `streamlit run rtss_console.py`。
+- 驗證：`python -m py_compile rtss_console.py` 通過；Streamlit 本機 8502 頁面成功載入；全套 **60 passed**。
+
 
 ## 14. 第五階段 A2：即市上雲（zcode，2026-09-09 深夜）——等 KL 貼 env 即著
 
