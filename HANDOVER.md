@@ -297,7 +297,7 @@ pytest -q                                      # 49 tests 全綠
 - 修復後實測：09-10 raw **17** 條，build 後 **7** 條可解析＋**1** 條 `parse_failed`，最新 alert_ts=`2026-09-10 14:33:21`；重建 `rtss_alerts_20260910.csv`／by-stock／metadata／diff。故 09-10 並非無 alert，而係抓取層漏資料。
 - Drive 唯一交收目標：`G:\我的雲端硬碟\RTSS\RTSS_TG`（folder ID `1H0I2YUQn1_JRN1O3zBZUepm88YAarKpx`）；全 Drive 盤點 09-10 檔只見於此夾，GUI／流程停止使用其他 parent 夾。
 - 09-10 數據質量修補：`clean_alert_text()` 清除 Telegram 尾部 view count／瀏覽器本地時間（如 `77 02:48`），CDP 只接受有 `.text-content`／`.translatable-message` 的訊息泡，並清理既有 raw 檔中的純 UI 行（如 `77 04:31`）。parser 以 `📈` 後至 `(HK.xxxxx)` 前取 name；無 emoji 的舊 DOM 亦會先隔走標題行。
-- 實測：01555 `alert_ts=2026-09-10 09:48:37`（HKT）、name=`MI能源`、raw_text 不含 `02:48`；重抓後 raw **7** 條，build **8** 行（7 可解析＋1 原有 `parse_failed`），全套 pytest **63 passed**。09-10 產物已重送唯一 `RTSS_TG` 目標。
+- 實測：01555 `alert_ts=2026-09-10 09:48:37`（HKT）、name=`MI能源`、raw_text 不含 `02:48`；重抓後 raw **7** 條，build **7** 行（`parse_failed=0`，舊 CSV 殘留 UI 行亦已清走），全套 pytest **63 passed**。09-10 產物已重送唯一 `RTSS_TG` 目標。
 
 
 ## 14. 第五階段 A2：即市上雲（zcode，2026-09-09 深夜）——等 KL 貼 env 即著
