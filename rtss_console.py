@@ -170,6 +170,13 @@ def show_summary(day: date) -> None:
     c3.metric("RTSS 有／我哋冇", int(counts.get("rtss_only", 0)))
     c4.metric("我哋有／RTSS 冇", int(counts.get("stockscan_only", 0)))
     st.caption(f"alerts：{alerts}　|　diff：{diff}")
+    meta = alerts.with_suffix(".meta.json")
+    if meta.exists():
+        try:
+            info = json.loads(meta.read_text(encoding="utf-8"))
+            st.caption(f"實際 alert 時間範圍：{info.get('earliest_alert_ts') or '—'} → {info.get('latest_alert_ts') or '—'}")
+        except (OSError, json.JSONDecodeError):
+            pass
 
 
 def copy_to_drive(mode: str, day: date, destination: Path) -> tuple[list[Path], list[Path]]:
@@ -358,10 +365,13 @@ else:
     c2.metric("RTSS 有／我哋冇", int(groups.get("rtss_only", 0)))
     c3.metric("我哋有／RTSS 冇", int(groups.get("stockscan_only", 0)))
     if not history.empty:
+        show_columns = [c for c in ("group", "code5", "name", "rtss_count", "rtss_first_ts",
+                                    "rtss_max_count_today", "rtss_max_chg_pct", "stockscan_count",
+                                    "rtss_types", "stockscan_types", "possible_reason") if c in history.columns]
         for group, title in (("both", "兩邊都有"), ("rtss_only", "RTSS 有／我哋冇"),
                              ("stockscan_only", "我哋有／RTSS 冇")):
             st.subheader(title)
-            st.table(history[history["group"] == group].style.hide(axis="index"))
+            st.table(history.loc[history["group"] == group, show_columns].style.hide(axis="index"))
     trend_rows = []
     for d in available:
         path = REPORT_DIR / f"rtss_daily_diff_{d:%Y%m%d}.csv"

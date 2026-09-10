@@ -14,7 +14,7 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from scripts.build_rtss_alerts import COLUMNS
+from scripts.build_rtss_alerts import COLUMNS, _write_metadata, write_daily_by_stock
 from stockscan.io_utils import today_hkt, write_csv
 from stockscan.rtss_parser import parse_alert
 
@@ -62,22 +62,25 @@ def import_backfill(source: Path, start: date, end: date) -> dict:
         if not start <= msg_date <= end:
             continue
         total += 1
-        parsed_row = parse_alert(message_text or "")
-        if parsed_row["parse_failed"]:
-            failed += 1
-            continue
-        parsed += 1
-        parsed_row.update({
-            "message_date": msg_date.isoformat(),
-            "message_key": f"{chat_key}:{message_id}",
-            "raw_text": str(message_text or "").strip(),
-        })
-        grouped.setdefault(msg_date, {})[parsed_row["message_key"]] = parsed_row
+        parsed_row = parse_alert(
+            message_text or "", message_date=msg_date,
+            msg_id=f"{chat_key}:{message_id}" if message_id else None,
+        )
+        failed += int(parsed_row["parse_failed"])
+        parsed += int(not parsed_row["parse_failed"])
+        key = f"{parsed_row.get('code5', '')}|{parsed_row.get('alert_ts', '')}"
+        if key == "|":
+            key = f"msg|{parsed_row['msg_id']}"
+        grouped.setdefault(msg_date, {})[key] = parsed_row
 
     for msg_date in sorted(grouped):
         path = RTSS_DIR / f"rtss_alerts_{msg_date:%Y%m%d}.csv"
         frame = pd.DataFrame(grouped[msg_date].values(), columns=COLUMNS)
-        write_csv(frame.sort_values(["time", "code5"]), path)
+        frame = frame.drop_duplicates(subset=["code5", "alert_ts"], keep="last")
+        frame = frame.sort_values(["alert_ts", "code5"], na_position="last").reset_index(drop=True)
+        write_csv(frame, path)
+        _write_metadata(frame, path)
+        write_daily_by_stock(msg_date, frame)
     print(f"[rtss-backfill] source range={min_seen}..{max_seen}; in_range={total}; parsed={parsed}; parse_failed={failed}; days={len(grouped)}")
     return {"source_min": min_seen, "source_max": max_seen, "in_range": total,
             "parsed": parsed, "parse_failed": failed, "days": len(grouped)}

@@ -18,7 +18,8 @@ INTRADAY_DIR = Path("data/intraday")
 REPORT_DIR = Path("data/reports")
 OUT_COLUMNS = [
     "group", "code5", "name", "rtss_count", "stockscan_count",
-    "rtss_types", "stockscan_types", "possible_reason",
+    "rtss_types", "stockscan_types", "rtss_first_ts", "rtss_max_count_today",
+    "rtss_max_chg_pct", "possible_reason",
 ]
 
 
@@ -30,6 +31,9 @@ def _read(path: Path) -> pd.DataFrame:
 
 def _normalise(frame: pd.DataFrame) -> pd.DataFrame:
     if frame.empty:
+        if "code5" not in frame.columns:
+            frame = frame.copy()
+            frame["code5"] = pd.Series(dtype=str)
         return frame
     out = frame.copy()
     out["code5"] = out["code5"].astype(str).str.extract(r"(\d{1,5})", expand=False).str.zfill(5)
@@ -55,6 +59,8 @@ def compare_day(day: date, rtss_path: Path | None = None, stockscan_path: Path |
                 out_path: Path | None = None) -> Path:
     rtss = _normalise(_read(rtss_path or RTSS_DIR / f"rtss_alerts_{day:%Y%m%d}.csv"))
     ours = _normalise(_read(stockscan_path or INTRADAY_DIR / f"alerts_{day:%Y%m%d}.csv"))
+    if not rtss.empty and {"code5", "alert_ts"}.issubset(rtss.columns):
+        rtss = rtss.drop_duplicates(subset=["code5", "alert_ts"], keep="last")
     rtss_codes = set(rtss["code5"]) if not rtss.empty else set()
     ours_codes = set(ours["code5"]) if not ours.empty else set()
     rows: list[dict] = []
@@ -76,6 +82,12 @@ def compare_day(day: date, rtss_path: Path | None = None, stockscan_path: Path |
             "stockscan_count": len(o),
             "rtss_types": ";".join(sorted(r.get("msg_type", pd.Series(dtype=str)).dropna().astype(str).unique())),
             "stockscan_types": ";".join(sorted(o.get("alert_type", pd.Series(dtype=str)).dropna().astype(str).unique())),
+            "rtss_first_ts": (r["alert_ts"].dropna().astype(str).min()
+                              if not r.empty and "alert_ts" in r else ""),
+            "rtss_max_count_today": (pd.to_numeric(r["count_today"], errors="coerce").max()
+                                      if not r.empty and "count_today" in r else ""),
+            "rtss_max_chg_pct": (pd.to_numeric(r["chg_pct"], errors="coerce").max()
+                                  if not r.empty and "chg_pct" in r else ""),
             "possible_reason": _reasons(r) if group == "rtss_only" else "",
         })
     result = pd.DataFrame(rows, columns=OUT_COLUMNS)

@@ -290,6 +290,9 @@ pytest -q                                      # 49 tests 全綠
 - 安全口徑：GUI 只讀現有 script 產物及 exporter `message_text`；`data/rtss/` 繼續 gitignored，不納入 commit。
 - 啟動：雙擊 `啟動RTSS.bat`，或 `streamlit run rtss_console.py`。
 - 驗證：`python -m py_compile rtss_console.py` 通過；Streamlit 本機 8502 頁面成功載入；全套 **60 passed**。
+- 數據質量修復（2026-09-10）：`stockscan/rtss_parser.py` 加入新逐條 schema（`msg_id`／`alert_ts`／原文數值／級距拆欄／category），`(code5, alert_ts)` 去重；新增 `scripts/rebuild_rtss_schema.py`、逐股日彙總及 `.meta.json` 時間範圍。
+- 由 TGWebExporter SQLite 以 HKT 重建 2025-08-29 至 2026-09-10 共 **378** 個每日檔；來源實際涵蓋至 2026-08-28（`source range=2025-06-26..2026-08-28`），範圍後日期保留空 schema，唔虛構 alert。新 schema 重複鍵驗證 **0**。
+- 01536 pytest 兩條樣本驗證 `14:24:13`／`14:42:53` 分開，第二條 `count_today=2`、級距 `22→32`；全套 pytest **61 passed**。逐條／by-stock／metadata／diff 產物已重送固定 `RTSS_TG`（共 1513 檔）。
 
 
 ## 14. 第五階段 A2：即市上雲（zcode，2026-09-09 深夜）——等 KL 貼 env 即著

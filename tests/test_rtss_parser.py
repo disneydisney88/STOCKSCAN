@@ -39,3 +39,22 @@ def test_parse_single_line_alert():
     assert got["mcap"] == approx(255_000_000)
     assert got["turnover"] == approx(5_902_500)
     assert got["parse_failed"] == 0
+
+
+def test_01536_two_alerts_keep_distinct_alert_ts():
+    first = parse_alert(
+        "急升異動 [當日第1次]\n煜榮集團 (HK.01536) 市值: 1.50億 成交額: 231.77萬 "
+        "升幅: +22.00% 最新價: 0.300 🕐 14:24:13",
+        message_date="2026-09-08",
+    )
+    second = parse_alert(
+        "急升異動 [當日第2次 (22%→32%)]\n煜榮集團 (HK.01536) 市值: 1.50億 成交額: 231.77萬 "
+        "升幅: +32.00% 最新價: 0.330 🕐 14:42:53",
+        message_date="2026-09-08",
+    )
+    assert first["alert_ts"] == "2026-09-08 14:24:13"
+    assert second["alert_ts"] == "2026-09-08 14:42:53"
+    assert first["alert_ts"] != second["alert_ts"]
+    assert second["count_today"] == 2
+    assert second["level_from"] == 22
+    assert second["level_to"] == 32

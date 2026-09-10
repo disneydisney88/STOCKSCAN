@@ -17,9 +17,9 @@ from stockscan.rtss_parser import parse_alert
 
 RTSS_DIR = Path("data/rtss")
 COLUMNS = [
-    "msg_type", "code5", "name", "mcap", "turnover", "chg_pct",
-    "last_price", "time", "count_today", "level_range", "parse_failed",
-    "message_date", "message_key", "raw_text",
+    "msg_id", "alert_ts", "date", "time", "code5", "name", "msg_type",
+    "count_today", "level_from", "level_to", "mcap", "mcap_raw", "turnover",
+    "turnover_raw", "chg_pct", "last_price", "category", "raw_text", "parse_failed",
 ]
 
 
@@ -31,7 +31,7 @@ def build_day(day: date, raw_path: Path | None = None, out_path: Path | None = N
         try:
             old = pd.read_csv(out_path, dtype={"code5": str}, encoding="utf-8-sig")
             for row in old.to_dict("records"):
-                key = f"{str(row.get('code5', '')).zfill(5)}|{row.get('time', '')}"
+                key = f"{str(row.get('code5', '')).zfill(5)}|{row.get('alert_ts', '') or row.get('time', '')}"
                 records[key] = row
         except (OSError, ValueError) as exc:
             print(f"[rtss-output] ignored unreadable existing CSV {out_path}: {exc}", file=sys.stderr)
@@ -42,20 +42,52 @@ def build_day(day: date, raw_path: Path | None = None, out_path: Path | None = N
             except json.JSONDecodeError:
                 print(f"[rtss-output] ignored malformed raw line {raw_path}:{line_no}", file=sys.stderr)
                 continue
-            parsed = parse_alert(raw.get("raw_text", ""))
-            parsed["message_date"] = raw.get("message_date") or day.isoformat()
-            parsed["message_key"] = raw.get("message_key", "")
-            key = f"{parsed.get('code5', '')}|{parsed.get('time', '')}"
+            parsed = parse_alert(raw.get("raw_text", ""), raw.get("message_date") or day.isoformat(),
+                                 raw.get("message_key") or None)
+            key = f"{parsed.get('code5', '')}|{parsed.get('alert_ts', '')}"
             if key == "|":
-                key = f"raw|{parsed.get('message_key', '')}"
+                key = f"raw|{parsed.get('msg_id', '')}"
             records[key] = parsed
     frame = pd.DataFrame(list(records.values()), columns=COLUMNS)
     if not frame.empty:
-        frame = frame.sort_values(["time", "code5"], na_position="last").reset_index(drop=True)
+        frame = frame.drop_duplicates(subset=["code5", "alert_ts"], keep="last")
+        frame = frame.sort_values(["alert_ts", "code5"], na_position="last").reset_index(drop=True)
     write_csv(frame, out_path)
+    _write_metadata(frame, out_path)
+    write_daily_by_stock(day, frame)
     failed = int(frame["parse_failed"].sum()) if not frame.empty else 0
     print(f"[rtss-output] {day:%Y%m%d}: {len(frame)} alerts ({failed} parse_failed) -> {out_path}")
     return out_path
+
+
+def _write_metadata(frame: pd.DataFrame, out_path: Path) -> None:
+    values = pd.to_datetime(frame.get("alert_ts", pd.Series(dtype=str)), errors="coerce")
+    valid = values.dropna()
+    metadata = {
+        "rows": len(frame),
+        "earliest_alert_ts": valid.min().strftime("%Y-%m-%d %H:%M:%S") if not valid.empty else None,
+        "latest_alert_ts": valid.max().strftime("%Y-%m-%d %H:%M:%S") if not valid.empty else None,
+        "unique_key": ["code5", "alert_ts"],
+    }
+    out_path.with_suffix(".meta.json").write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def write_daily_by_stock(day: date, frame: pd.DataFrame) -> Path:
+    out_path = RTSS_DIR / f"rtss_daily_by_stock_{day:%Y%m%d}.csv"
+    if frame.empty:
+        summary = pd.DataFrame(columns=["code5", "name", "alert_count", "max_count_today",
+                                       "first_ts", "last_ts", "max_chg_pct", "msg_types"])
+    else:
+        work = frame.copy()
+        work["chg_pct"] = pd.to_numeric(work["chg_pct"], errors="coerce")
+        work["count_today"] = pd.to_numeric(work["count_today"], errors="coerce")
+        summary = work.groupby("code5", as_index=False).agg(
+            name=("name", "first"), alert_count=("alert_ts", "count"),
+            max_count_today=("count_today", "max"), first_ts=("alert_ts", "min"),
+            last_ts=("alert_ts", "max"), max_chg_pct=("chg_pct", "max"),
+            msg_types=("msg_type", lambda s: ";".join(sorted(set(s.dropna().astype(str)))))
+        )
+    return write_csv(summary, out_path)
 
 
 def main() -> int:
