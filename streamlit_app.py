@@ -24,6 +24,34 @@ from stockscan.io_utils import read_csv_if_exists, today_hkt  # noqa: E402
 
 st.set_page_config(page_title="STOCKSCAN 倍升雷達", page_icon="📡", layout="wide")
 
+st.markdown(
+    """
+    <style>
+    .block-container { max-width: 1600px; padding-top: 1.5rem; padding-bottom: 2rem; }
+    [data-testid="stMetric"] { border: 1px solid rgba(128,128,128,.22); border-radius: .75rem; padding: .65rem .8rem; }
+    [data-testid="stMetricValue"] { font-size: 1.35rem; }
+    button[kind="primary"] { border-radius: .6rem; }
+    [data-testid="stTabs"] button { font-weight: 600; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+st.markdown("## 📡 STOCKSCAN 倍升雷達")
+st.caption(f"港股價量監控・RTSS 對照・研究面板　｜　今日 HKT：{today_hkt():%Y-%m-%d}")
+st.divider()
+
+st.sidebar.title("📡 STOCKSCAN")
+st.sidebar.caption("港股價量監控儀表板")
+st.sidebar.divider()
+st.sidebar.subheader("快速導覽")
+st.sidebar.markdown(
+    "**收市榜**：睇訊號 A 排行\n\n"
+    "**即市掃描**：睇訊號 B 同時點快照\n\n"
+    "**個股研究**：輸入 5 位代號查完整紀錄"
+)
+st.sidebar.caption(f"資料日曆以 HKT 計算：{today_hkt():%Y-%m-%d}")
+
 RTSS_8_COLS = ["code5", "name", "close", "chg_pct",
                "turnover_day", "mcap_total", "ratio", "turnover_to_mcap"]
 
@@ -63,6 +91,11 @@ with tab1:
         if df.empty:
             st.info("呢個檔係空嘅（當日冇命中）。")
         else:
+            c1, c2, c3 = st.columns(3)
+            c1.metric("上榜股票", len(df))
+            ratios = pd.to_numeric(df.get("ratio"), errors="coerce")
+            c2.metric("最高成交倍數", f"{ratios.max():,.1f}x" if ratios.notna().any() else "—")
+            c3.metric("數據截至", data_asof(df))
             st.caption(f"共 {len(df)} 隻，按市值由細到大（RTSS 口徑）。"
                        "成交額／市值單位：百萬港元（M）。　數據截至：" + data_asof(df))
             st.table(fmt_df(df[RTSS_8_COLS]).style.hide(axis="index"))
@@ -71,8 +104,9 @@ with tab1:
                                file_name=pick.name, mime="text/csv")
 
 with tab2:
-    st.caption("SURGE（急升）：市值 <10 億、即市成交 ≥50 萬、升幅 ≥+20%，每多 20pt 再發；"
-               "VOLUME（爆量）：即市成交 ÷ ma10 ≥ 10x，每多 10x 再發。各計「當日第 N 次」。")
+    with st.expander("ℹ️ 掃描規則（按需要展開）"):
+        st.markdown("SURGE（急升）：市值 <10 億、即市成交 ≥50 萬、升幅 ≥+20%，每多 20pt 再發。\n\n"
+                    "VOLUME（爆量）：即市成交 ÷ ma10 ≥ 10x，每多 10x 再發。各計「當日第 N 次」。")
     left, right = st.columns([1, 2])
     with left:
         run_btn = st.button("⚡ 即掃一次（本機）", type="primary",
@@ -146,7 +180,7 @@ with tab2:
                 lambda r: ("⭐ " + str(r["name"])) if r["首次出現"] else r["name"], axis=1)
             st.caption(f"{snap.name.replace('snapshot_', '').replace('.csv', '')}　"
                        f"ratio≥10 共 {len(sdf)} 隻（⭐＝本日首次出現）")
-            st.dataframe(sdf, use_container_width=True, hide_index=True)
+            st.dataframe(sdf, use_container_width=True, height=800, hide_index=True)
     else:
         st.caption("未有時點快照（daemon 會喺 10:30/11:30/13:30/15:30/16:00 自動寫）。")
 
@@ -258,7 +292,7 @@ with tab6:
         if evs:
             st.dataframe(pd.DataFrame(evs)[
                 ["event_type", "announce_date", "key_date_1", "ratio", "status"]
-            ], use_container_width=True, hide_index=True)
+            ], use_container_width=True, height=800, hide_index=True)
         else:
             st.write("無紀錄")
 
@@ -274,7 +308,7 @@ with tab6:
                     lambda x: any(abs((x - pd.Timestamp(h)).days) <= 5 for h in hit_days))]
                 if not near_rows.empty:
                     st.dataframe(near_rows.drop(columns=["date_dt"]),
-                                 use_container_width=True, hide_index=True)
+                                 use_container_width=True, height=800, hide_index=True)
                     shown_shots = True
         if not shown_shots:
             st.write("無紀錄")
@@ -290,7 +324,7 @@ with tab6:
                 st.write("無紀錄")
             else:
                 st.caption(f"出現 {len(nr)} 次（n_max_est 為歷史估算）")
-                st.dataframe(nr, use_container_width=True, hide_index=True)
+                st.dataframe(nr, use_container_width=True, height=800, hide_index=True)
 
         # 5) CCASS（M7）
         st.subheader("🏦 CCASS 集中度和主要變動")
@@ -314,7 +348,7 @@ with tab6:
                     hit_alerts.append(m)
         if hit_alerts:
             st.dataframe(pd.concat(hit_alerts, ignore_index=True),
-                         use_container_width=True, hide_index=True)
+                         use_container_width=True, height=800, hide_index=True)
         else:
             st.write("無紀錄")
 
@@ -367,7 +401,7 @@ with tab8:
             pick_day = st.selectbox("揀日期", sorted(flagged["scan_date"].unique(), reverse=True),
                                     key="duck_day")
             st.dataframe(flagged[flagged["scan_date"] == pick_day],
-                         use_container_width=True, hide_index=True)
+                         use_container_width=True, height=800, hide_index=True)
 
 with tab9:
     st.caption("L 型候選＝過去 180 日有 GO／換主，之後未見配股供股（等表演）。只列旗標，唔構成投資建議。")
@@ -382,12 +416,15 @@ with tab9:
             stage = st.selectbox("篩 stage", ["全部", "GO_等表演", "GO_已配供"], key="l_stage")
             show = ldf if stage == "全部" else ldf[ldf["l_shape_stage"] == stage]
             st.caption(f"{l_files[0].name}　{len(show)}/{len(ldf)} 隻")
-            st.dataframe(show, use_container_width=True, hide_index=True)
+            st.dataframe(show, use_container_width=True, height=800, hide_index=True)
 
 if UNIVERSE_CSV.exists():
     uni = read_csv_if_exists(UNIVERSE_CSV)
     st.sidebar.metric("宇宙（掃描中）", int((uni["in_scan"] == 1).sum()))
     st.sidebar.metric("宇宙（總數）", len(uni))
+
+st.sidebar.divider()
+st.sidebar.caption("提示：先揀上方 tab，再用日期／代號篩選；表格可橫向拖動。")
 
 st.sidebar.caption(DISCLAIMER)
 st.caption("—" * 40)
