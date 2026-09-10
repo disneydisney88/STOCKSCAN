@@ -13,7 +13,7 @@ import subprocess
 import sys
 import urllib.error
 import urllib.request
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -175,6 +175,8 @@ def show_summary(day: date) -> None:
 def copy_to_drive(mode: str, day: date, destination: Path) -> tuple[list[Path], list[Path]]:
     if mode == "今日 diff CSV":
         files = [REPORT_DIR / f"rtss_daily_diff_{day:%Y%m%d}.csv"]
+    elif mode == "指定日期 diff CSV":
+        files = [REPORT_DIR / f"rtss_daily_diff_{day:%Y%m%d}.csv"]
     elif mode == "指定日期 alerts CSV":
         files = [RTSS_DIR / f"rtss_alerts_{day:%Y%m%d}.csv"]
     else:
@@ -305,18 +307,33 @@ if import_run:
 
 st.divider()
 st.header("4. 送 Google Drive 交收夾")
+drive_dates: list[date] = []
+for path in REPORT_DIR.glob("rtss_daily_diff_*.csv"):
+    try:
+        drive_dates.append(datetime.strptime(path.stem.removeprefix("rtss_daily_diff_"), "%Y%m%d").date())
+    except ValueError:
+        continue
+drive_dates = sorted(set(drive_dates), reverse=True)
 drive_col1, drive_col2, drive_button = st.columns([1, 2, 1])
 with drive_col1:
-    drive_mode = st.selectbox("要送咩", ["今日 diff CSV", "指定日期 alerts CSV", "全部 rtss_alerts"])
+    drive_mode = st.selectbox("要送咩", ["今日 diff CSV", "指定日期 diff CSV",
+                                           "指定日期 alerts CSV", "全部 rtss_alerts"])
 with drive_col2:
     drive_path = st.text_input("固定交收夾", value=str(DEFAULT_DRIVE), disabled=True)
 with drive_button:
     st.write("")
     st.write("")
     drive_run = st.button("☁️ 送去 Drive")
+if drive_dates:
+    drive_day = st.selectbox("指定交收日期", drive_dates, format_func=lambda d: d.isoformat(),
+                             key="drive_day")
+    st.caption("已有 diff：" + "、".join(d.isoformat() for d in drive_dates))
+else:
+    drive_day = single_day
+    st.caption("目前未有 diff 產物；先完成抓取／匯入流程，再送去 Drive。")
 if drive_run:
     try:
-        copied, skipped = copy_to_drive(drive_mode, single_day, Path(drive_path))
+        copied, skipped = copy_to_drive(drive_mode, drive_day, Path(drive_path))
         if copied:
             st.success(f"已新增 {len(copied)} 檔到 {drive_path}")
         if skipped:
