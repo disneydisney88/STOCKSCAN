@@ -23,11 +23,12 @@ COLUMNS = [
 ]
 
 
-def build_day(day: date, raw_path: Path | None = None, out_path: Path | None = None) -> Path:
+def build_day(day: date, raw_path: Path | None = None, out_path: Path | None = None,
+              fresh: bool = False) -> Path:
     raw_path = raw_path or RTSS_DIR / f"raw_dom_{day:%Y%m%d}.jsonl"
     out_path = out_path or RTSS_DIR / f"rtss_alerts_{day:%Y%m%d}.csv"
     records: dict[str, dict] = {}
-    if out_path.exists():
+    if out_path.exists() and not fresh:
         try:
             old = pd.read_csv(out_path, dtype={"code5": str}, encoding="utf-8-sig")
             for row in old.to_dict("records"):
@@ -72,7 +73,12 @@ def _write_metadata(frame: pd.DataFrame, out_path: Path) -> None:
         "latest_alert_ts": valid.max().strftime("%Y-%m-%d %H:%M:%S") if not valid.empty else None,
         "unique_key": ["code5", "alert_ts"],
     }
-    out_path.with_suffix(".meta.json").write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
+    try:
+        out_path.with_suffix(".meta.json").write_text(
+            json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+    except PermissionError as exc:
+        print(f"[rtss-output] warning: metadata locked, skipped {out_path}: {exc}", file=sys.stderr)
 
 
 def write_daily_by_stock(day: date, frame: pd.DataFrame) -> Path:
@@ -82,6 +88,7 @@ def write_daily_by_stock(day: date, frame: pd.DataFrame) -> Path:
                                        "first_ts", "last_ts", "max_chg_pct", "msg_types"])
     else:
         work = frame.copy()
+        work["alert_ts"] = pd.to_datetime(work["alert_ts"], errors="coerce")
         work["chg_pct"] = pd.to_numeric(work["chg_pct"], errors="coerce")
         work["count_today"] = pd.to_numeric(work["count_today"], errors="coerce")
         summary = work.groupby("code5", as_index=False).agg(
@@ -99,6 +106,7 @@ def main() -> int:
     ap.add_argument("--backfill", action="store_true")
     ap.add_argument("--from", dest="from_date")
     ap.add_argument("--to", dest="to_date")
+    ap.add_argument("--fresh", action="store_true", help="ignore existing alert CSV and rebuild from raw")
     args = ap.parse_args()
     if args.backfill:
         if not args.from_date or not args.to_date:
@@ -109,7 +117,7 @@ def main() -> int:
     if start > end:
         raise SystemExit("日期範圍無效")
     for offset in range((end - start).days + 1):
-        build_day(start + timedelta(days=offset))
+        build_day(start + timedelta(days=offset), fresh=args.fresh)
     return 0
 
 

@@ -10,6 +10,7 @@ import argparse
 import hashlib
 import json
 import re
+import shutil
 import sys
 import time
 from datetime import date, datetime, timedelta
@@ -274,6 +275,50 @@ def _scroll_down(scroll, page) -> None:
     page.wait_for_timeout(400)
 
 
+def _harvest_day(page, target: date, max_local_steps: int = 15) -> list[dict]:
+    """Harvest one calendar anchor only; never build a long scroll chain."""
+    scroll = _scrollable(page)
+    seen: dict[str, dict] = {}
+
+    def harvest() -> tuple[set[date], set[date]]:
+        dates: set[date] = set()
+        for row in _message_rows(page):
+            title = str(row.get("dom_title") or "")
+            msg_date = _date_from_title(title) or _date_from_label(str(row.get("date_label") or ""))
+            if msg_date:
+                dates.add(msg_date)
+            if msg_date != target:
+                continue
+            text = clean_alert_text(str(row.get("raw_text") or ""))
+            if not text:
+                continue
+            key = hashlib.sha256(f"{title}\n{text}".encode("utf-8", errors="replace")).hexdigest()
+            seen[key] = {
+                "message_key": key, "message_date": target.isoformat(),
+                "dom_title": title, "raw_text": text, "source_url": page.url,
+                "captured_at_hkt": now_hkt().isoformat(),
+            }
+        return dates, set(seen)
+
+    _jump_to_date(page, target)
+    dates, _ = harvest()
+    for i in range(max_local_steps):
+        if any(d < target for d in dates):
+            break
+        _scroll_up(scroll, page)
+        dates, _ = harvest()
+
+    _jump_to_date(page, target)
+    dates, _ = harvest()
+    for i in range(max_local_steps):
+        if any(d > target for d in dates):
+            break
+        _scroll_down(scroll, page)
+        dates, _ = harvest()
+    print(f"[rtss-cdp] day={target.isoformat()} visited=1 count={len(seen)}")
+    return sorted(seen.values(), key=lambda r: (r["dom_title"], r["message_key"]))
+
+
 def _scrollable(page):
     loc = page.locator(".bubbles-scrollable, .MessageList.custom-scroll, .Transition.MessageList").first
     if loc.count():
@@ -406,7 +451,14 @@ def main() -> int:
             return 1
         page = candidates[0]
         _assert_client(page)
-        rows = collect_rows(page, start, end, do_scroll=not args.no_scroll)
+        rows: list[dict] = []
+        if args.no_scroll:
+            rows = collect_rows(page, start, end, do_scroll=False)
+        else:
+            # I 主路線：每一日獨立跳轉；不依賴任何 restore_latest 或長距離捲動。
+            for offset in range((end - start).days + 1):
+                day = start + timedelta(days=offset)
+                rows.extend(_harvest_day(page, day))
         alert_times = []
         for row in rows:
             try:
