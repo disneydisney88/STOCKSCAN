@@ -28,6 +28,9 @@ CDP_URL = "http://127.0.0.1:9222"
 # Match the stable numeric channel ID in either URL form.
 RTSS_FRAGMENT = "2795969450"
 OUT_DIR = Path("data/rtss")
+CHECKPOINT_PATH = OUT_DIR / "backfill_ckpt.json"
+MAX_SCROLL_ROUNDS = 600
+STABLE_ROUNDS_LIMIT = 8
 TITLE_DATE_RE = re.compile(r"^(\d{1,2} [A-Za-z]+ \d{4}),")
 TIME_RE = re.compile(r"\b(\d{1,2}:\d{2}:\d{2})\b")
 
@@ -107,7 +110,7 @@ def collect_rows(page, start: date, end: date) -> list[dict]:
 
     seen: dict[str, dict] = {}
     stable_rounds = 0
-    for _ in range(120):
+    for _ in range(MAX_SCROLL_ROUNDS):
         rows = _message_rows(page)
         before = len(seen)
         dates_seen: list[date] = []
@@ -138,7 +141,7 @@ def collect_rows(page, start: date, end: date) -> list[dict]:
             stable_rounds = 0
         if oldest and oldest <= start:
             break
-        if stable_rounds >= 4:
+        if stable_rounds >= STABLE_ROUNDS_LIMIT:
             break
 
         try:
@@ -234,6 +237,19 @@ def main() -> int:
         print(f"[rtss-cdp] {day_key}: {len(existing)} raw text messages -> {path}")
         if not existing:
             print(f"[rtss-cdp] WARNING: no RTSS text messages found for {day_key}", file=sys.stderr)
+        if args.backfill:
+            checkpoint = {"completed_dates": [], "last_message_id": ""}
+            if CHECKPOINT_PATH.exists():
+                try:
+                    checkpoint = json.loads(CHECKPOINT_PATH.read_text(encoding="utf-8"))
+                except json.JSONDecodeError:
+                    pass
+            completed = set(checkpoint.get("completed_dates", []))
+            completed.add(day.isoformat())
+            checkpoint["completed_dates"] = sorted(completed)
+            checkpoint["last_message_id"] = (existing[next(reversed(existing))].get("dom_message_id", "")
+                                               if existing else checkpoint.get("last_message_id", ""))
+            CHECKPOINT_PATH.write_text(json.dumps(checkpoint, ensure_ascii=False, indent=2), encoding="utf-8")
     return 0
 
 
