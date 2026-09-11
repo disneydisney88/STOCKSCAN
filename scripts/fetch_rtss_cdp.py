@@ -107,16 +107,49 @@ def _assert_client(page) -> str:
     return client
 
 
-def _wait_for_sync(page, timeout_ms: int = 120_000) -> None:
-    """Do not harvest while Telegram channel header still says updating."""
-    deadline = time.monotonic() + timeout_ms / 1000
+def _scroll_up(scroll, page) -> None:
+    """The one scroll primitive shared by history probe and backfill."""
+    scroll.evaluate("""el => {
+      const step = Math.max(600, Math.floor(el.clientHeight * 0.85));
+      el.scrollTop = Math.max(0, el.scrollTop - step);
+      el.dispatchEvent(new Event('scroll', {bubbles: true}));
+    }""")
+    page.wait_for_timeout(500)
+
+
+def _message_ids(page) -> set[str]:
+    rows = _message_rows(page)
+    return {
+        str(row.get("dom_message_id") or hashlib.sha256(
+            f"{row.get('dom_title', '')}\n{row.get('raw_text', '')}".encode("utf-8", errors="replace")
+        ).hexdigest())
+        for row in rows
+    }
+
+
+def _probe_history_ready(page, timeout_s: int = 15) -> bool:
+    """Probe actual upward history loading; header text is diagnostic only."""
+    scroll = _scrollable(page)
+    if not scroll.count():
+        raise RuntimeError("history not loading: message scroll container not found")
+    before = _message_ids(page)
+    if not before:
+        raise RuntimeError("no messages in DOM — wrong tab or channel not opened")
+    header_has_updating = bool(page.get_by_text(re.compile(r"^updating\.?\.?$", re.I)).count())
+    if header_has_updating:
+        print("[rtss-cdp] header shows updating; using functional history probe")
+    _scroll_up(scroll, page)
+    deadline = time.monotonic() + timeout_s
     while time.monotonic() < deadline:
-        updating = page.get_by_text(re.compile(r"^updating\.?\.?$", re.I)).count()
-        if not updating:
-            print("[rtss-cdp] sync=ready")
-            return
-        page.wait_for_timeout(1000)
-    raise RuntimeError("Telegram Web is still updating; refusing to harvest partial history")
+        after = _message_ids(page)
+        if after - before:
+            print("[rtss-cdp] history_probe=ready")
+            return True
+        if scroll.evaluate("el => el.scrollTop <= 1"):
+            print("[rtss-cdp] history_probe=at_top")
+            return True
+        page.wait_for_timeout(500)
+    raise RuntimeError("history not loading: no new messages after probe scroll")
 
 
 def _scrollable(page):
@@ -175,8 +208,7 @@ def collect_rows(page, start: date, end: date) -> list[dict]:
             break
 
         try:
-            scroll.evaluate("el => { el.scrollTop = 0; el.dispatchEvent(new Event('scroll', {bubbles: true})); }")
-            page.wait_for_timeout(500)
+            _scroll_up(scroll, page)
         except PlaywrightTimeoutError:
             break
 
@@ -223,7 +255,7 @@ def main() -> int:
             return 1
         page = candidates[0]
         _assert_client(page)
-        _wait_for_sync(page)
+        _probe_history_ready(page)
         rows = collect_rows(page, start, end)
         alert_times = []
         for row in rows:
