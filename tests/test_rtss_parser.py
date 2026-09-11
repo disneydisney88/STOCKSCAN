@@ -52,6 +52,12 @@ def test_telegram_ui_only_row_is_parse_failed_without_ui_tail():
     assert got["raw_text"] == ""
 
 
+def test_earnings_notice_has_explicit_message_type():
+    got = parse_alert("2026-09-05 當日財報 無相關財報數據。", message_date="2026-09-05")
+    assert got["msg_type"] == "EARNINGS"
+    assert got["parse_failed"] == 1
+
+
 def test_parse_single_line_alert():
     got = parse_alert("3億以下急升異動 [當日第1次] 煜榮集團 (HK.01536) 市值: 2.55億 成交額: 590.25萬 升幅: +23.08% 最新價: 0.560 15:26:31")
     assert got["code5"] == "01536"

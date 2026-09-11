@@ -83,7 +83,8 @@ def parse_alert(text: str, message_date: date | str | None = None,
         "time": time_match.group(1) if time_match else "",
         "code5": code_match.group(1).zfill(5) if code_match else "",
         "name": _extract_name(raw) if code_match else "",
-        "msg_type": ("SURGE" if "急升異動" in raw else
+        "msg_type": ("EARNINGS" if "財報" in raw else
+                     "SURGE" if "急升異動" in raw else
                      "VOLUME" if "爆量" in raw else
                      "大市值" if "大市值" in raw else "UNKNOWN"),
         "count_today": int(count_match.group(1)) if count_match else None,

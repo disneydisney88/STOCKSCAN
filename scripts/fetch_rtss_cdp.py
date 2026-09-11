@@ -14,6 +14,7 @@ import sys
 import time
 from datetime import date, datetime, timedelta
 from pathlib import Path
+from urllib.parse import urlparse
 
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import sync_playwright
@@ -87,6 +88,35 @@ def _message_rows(page) -> list[dict]:
           };
         }).filter(Boolean)"""
     )
+
+
+def _assert_client(page) -> str:
+    """Fail loudly if the open tab is not a supported Telegram Web client."""
+    path = urlparse(page.url).path.rstrip("/")
+    if path.endswith("/a"):
+        client = "a"
+        if not page.locator(".MessageList.custom-scroll").count():
+            raise RuntimeError("Telegram Web A client asserted, but .MessageList is missing")
+    elif path.endswith("/k"):
+        client = "k"
+        if not page.locator(".bubbles, .bubbles-scrollable").count():
+            raise RuntimeError("Telegram Web K client asserted, but .bubbles container is missing")
+    else:
+        raise RuntimeError(f"Unsupported Telegram Web client path: {path or '/'} (expected /a or /k)")
+    print(f"[rtss-cdp] client={client} asserted")
+    return client
+
+
+def _wait_for_sync(page, timeout_ms: int = 120_000) -> None:
+    """Do not harvest while Telegram channel header still says updating."""
+    deadline = time.monotonic() + timeout_ms / 1000
+    while time.monotonic() < deadline:
+        updating = page.get_by_text(re.compile(r"^updating\.?\.?$", re.I)).count()
+        if not updating:
+            print("[rtss-cdp] sync=ready")
+            return
+        page.wait_for_timeout(1000)
+    raise RuntimeError("Telegram Web is still updating; refusing to harvest partial history")
 
 
 def _scrollable(page):
@@ -192,6 +222,8 @@ def main() -> int:
             print("[rtss-cdp] RTSS Chrome page not found", file=sys.stderr)
             return 1
         page = candidates[0]
+        _assert_client(page)
+        _wait_for_sync(page)
         rows = collect_rows(page, start, end)
         alert_times = []
         for row in rows:
