@@ -221,6 +221,59 @@ def _scroll_to_latest(page, target: date, max_iter: int = 300) -> None:
     raise RuntimeError(f"latest restore exceeded {max_iter} batches before {target.isoformat()}")
 
 
+def _jump_to_date(page, target: date) -> None:
+    """Use Telegram Web A's own calendar, then leave the list at target."""
+    # A prior interrupted/manual probe may leave the calendar modal open.
+    # Close that stale backdrop before opening a fresh picker.
+    stale_close = page.locator("#portals [title='Close'], .modal-backdrop").first
+    if stale_close.count() and stale_close.is_visible():
+        try:
+            if "modal-backdrop" in (stale_close.get_attribute("class") or ""):
+                stale_close.click(position={"x": 5, "y": 5})
+            else:
+                stale_close.click()
+            page.wait_for_timeout(200)
+        except PlaywrightTimeoutError:
+            pass
+    page.locator('[title="Jump to Date"]').first.click()
+    page.wait_for_timeout(300)
+    month_name = target.strftime("%B %Y")
+    for _ in range(24):
+        if page.get_by_text(month_name, exact=True).count():
+            break
+        prev = page.locator("button").filter(has=page.locator(".icon-previous")).last
+        if not prev.count():
+            raise RuntimeError(f"Telegram date picker has no previous-month control for {month_name}")
+        prev.click()
+        page.wait_for_timeout(100)
+    else:
+        raise RuntimeError(f"Telegram date picker could not reach {month_name}")
+    day_buttons = page.locator("button.day-button").filter(has_text=str(target.day))
+    enabled = [day_buttons.nth(i) for i in range(day_buttons.count())
+               if not day_buttons.nth(i).is_disabled()]
+    if not enabled:
+        raise RuntimeError(f"Telegram date picker has no enabled day {target.day} for {month_name}")
+    enabled[0].click()
+    confirm = page.locator("#portals button").filter(has_text="Jump to Date").last
+    if not confirm.count():
+        raise RuntimeError("Telegram date picker confirmation button not found")
+    confirm.click()
+    page.wait_for_timeout(1200)
+    print(f"[rtss-cdp] jump_date=ready target={target.isoformat()}")
+
+
+def _scroll_down(scroll, page) -> None:
+    page.bring_to_front()
+    box = scroll.bounding_box()
+    if not box:
+        raise RuntimeError("RTSS message scroll container has no bounding box")
+    page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+    client_height = scroll.evaluate("el => el.clientHeight")
+    step = max(1, int(client_height * SCROLL_OVERLAP_RATIO))
+    page.mouse.wheel(0, step)
+    page.wait_for_timeout(400)
+
+
 def _scrollable(page):
     loc = page.locator(".bubbles-scrollable, .MessageList.custom-scroll, .Transition.MessageList").first
     if loc.count():
@@ -235,14 +288,13 @@ def collect_rows(page, start: date, end: date, do_scroll: bool = True) -> list[d
     if not scroll.count():
         raise RuntimeError("RTSS message scroll container not found")
 
-    # Probe 會把 virtualized list 推到歷史端；逐批恢復到終日，唔可以
-    # 只 assign 一次 scrollHeight，否則只會停留在舊 buffer。
+    # 主路線：用 Telegram calendar 定位起日，再向下自然閱讀方向 harvest。
     if do_scroll:
-        _scroll_to_latest(page, end)
+        _jump_to_date(page, start)
 
     seen: dict[str, dict] = {}
     stable_rounds = 0
-    for _ in range(1 if not do_scroll else MAX_SCROLL_ROUNDS):
+    for i in range(1 if not do_scroll else MAX_SCROLL_ROUNDS):
         rows = _message_rows(page)
         before = len(seen)
         dates_seen: list[date] = []
@@ -267,10 +319,11 @@ def collect_rows(page, start: date, end: date, do_scroll: bool = True) -> list[d
             }
 
         oldest = min(dates_seen) if dates_seen else None
+        newest = max(dates_seen) if dates_seen else None
         scroll_top = scroll.evaluate("el => el.scrollTop")
         print(
             f"[rtss-cdp] harvest scrollTop={scroll_top} "
-            f"oldest={oldest or '—'} rows={len(seen)}"
+            f"oldest={oldest or '—'} newest={newest or '—'} rows={len(seen)}"
         )
         if len(seen) == before:
             stable_rounds += 1
@@ -278,13 +331,13 @@ def collect_rows(page, start: date, end: date, do_scroll: bool = True) -> list[d
             stable_rounds = 0
         if not do_scroll:
             break
-        if oldest and oldest <= start:
+        if newest and newest >= end:
             break
         if stable_rounds >= STABLE_ROUNDS_LIMIT:
             break
 
         try:
-            _scroll_up(scroll, page)
+            _scroll_down(scroll, page)
         except PlaywrightTimeoutError:
             break
 
@@ -353,8 +406,6 @@ def main() -> int:
             return 1
         page = candidates[0]
         _assert_client(page)
-        if not args.no_scroll:
-            _probe_history_ready(page)
         rows = collect_rows(page, start, end, do_scroll=not args.no_scroll)
         alert_times = []
         for row in rows:
