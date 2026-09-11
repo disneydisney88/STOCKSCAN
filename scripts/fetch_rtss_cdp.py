@@ -117,6 +117,7 @@ def _assert_client(page) -> str:
 
 def _scroll_up(scroll, page) -> None:
     """The one scroll primitive shared by history probe and backfill."""
+    page.bring_to_front()
     box = scroll.bounding_box()
     if not box:
         raise RuntimeError("RTSS message scroll container has no bounding box")
@@ -137,6 +138,7 @@ def _message_ids(page) -> set[str]:
 
 def _probe_history_ready(page, timeout_s: int = 15) -> bool:
     """Probe actual upward history loading; header text is diagnostic only."""
+    page.bring_to_front()
     scroll = _scrollable(page)
     if not scroll.count():
         raise RuntimeError("history not loading: message scroll container not found")
