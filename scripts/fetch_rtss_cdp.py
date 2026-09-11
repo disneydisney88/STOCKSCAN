@@ -40,6 +40,10 @@ def _date_from_title(title: str) -> date | None:
     match = TITLE_DATE_RE.search(title or "")
     if not match:
         return None
+    try:
+        return datetime.strptime(match.group(1), "%d %B %Y").date()
+    except ValueError:
+        return None
 
 
 def _date_from_label(label: str) -> date | None:
@@ -57,18 +61,14 @@ def _date_from_label(label: str) -> date | None:
             candidate = today - timedelta(days=delta)
             if candidate.strftime("%A").lower() == label.lower():
                 return candidate
-    for fmt in ("%Y-%m-%d", "%B %d", "%b %d"):
+    for fmt in ("%Y-%m-%d", "%B %d, %Y", "%b %d, %Y", "%B %d", "%b %d"):
         try:
-            parsed = datetime.strptime(label, fmt).date() if fmt == "%Y-%m-%d" else \
-                datetime.strptime(f"{today_hkt().year} {label}", f"%Y {fmt}").date()
-            return parsed if fmt == "%Y-%m-%d" else parsed.replace(year=today_hkt().year)
+            if fmt in ("%Y-%m-%d", "%B %d, %Y", "%b %d, %Y"):
+                return datetime.strptime(label, fmt).date()
+            return datetime.strptime(f"{today_hkt().year} {label}", f"%Y {fmt}").date()
         except ValueError:
             continue
     return None
-    try:
-        return datetime.strptime(match.group(1), "%d %B %Y").date()
-    except ValueError:
-        return None
 
 
 def _message_rows(page) -> list[dict]:
@@ -136,8 +136,8 @@ def _message_ids(page) -> set[str]:
     }
 
 
-def _probe_history_ready(page, timeout_s: int = 15) -> bool:
-    """Probe actual upward history loading; header text is diagnostic only."""
+def _probe_history_ready(page, max_iter: int = 200, timeout_s: int = 20) -> bool:
+    """Scroll to the sentinel before deciding that history is unavailable."""
     page.bring_to_front()
     scroll = _scrollable(page)
     if not scroll.count():
@@ -148,18 +148,74 @@ def _probe_history_ready(page, timeout_s: int = 15) -> bool:
     header_has_updating = bool(page.get_by_text(re.compile(r"^updating\.?\.?$", re.I)).count())
     if header_has_updating:
         print("[rtss-cdp] header shows updating; using functional history probe")
-    _scroll_up(scroll, page)
-    deadline = time.monotonic() + timeout_s
-    while time.monotonic() < deadline:
+    loaded = False
+    for i in range(max_iter):
+        scroll_top = scroll.evaluate("el => el.scrollTop")
+        print(f"[rtss-cdp] probe iter={i} scrollTop={scroll_top}")
+        if scroll_top <= 200:
+            break
+        _scroll_up(scroll, page)
         after = _message_ids(page)
         if after - before:
-            print("[rtss-cdp] history_probe=ready")
-            return True
-        if scroll.evaluate("el => el.scrollTop <= 1"):
-            print("[rtss-cdp] history_probe=at_top")
-            return True
-        page.wait_for_timeout(500)
+            loaded = True
+            before = after
+            print(f"[rtss-cdp] history_probe=new_nodes_at_iter={i}")
+    page.wait_for_timeout(timeout_s * 1000 // 4)
+    after = _message_ids(page)
+    if after - before:
+        loaded = True
+    if scroll.evaluate("el => el.scrollTop <= 200") and loaded:
+        print("[rtss-cdp] history_probe=ready_at_sentinel")
+        return True
+    if scroll.evaluate("el => el.scrollTop <= 200"):
+        print("[rtss-cdp] history_probe=at_top_no_new_messages")
+        return True
+    if loaded:
+        print("[rtss-cdp] history_probe=ready_loaded_virtualized_batches")
+        return True
     raise RuntimeError("history not loading: no new messages after probe scroll")
+
+
+def _scroll_to_latest(page, target: date, max_iter: int = 300) -> None:
+    """Restore the latest side after the sentinel probe's destructive scroll.
+
+    Telegram Web virtualizes the message list: assigning scrollHeight once only
+    advances one loaded batch.  Keep asking for the next batch until the DOM
+    contains the requested end date, otherwise the following harvest would
+    start in an old historical window.
+    """
+    scroll = _scrollable(page)
+    if not scroll.count():
+        raise RuntimeError("RTSS message scroll container not found")
+    last_max: date | None = None
+    no_progress = 0
+    for i in range(max_iter):
+        rows = _message_rows(page)
+        dates = [
+            _date_from_title(str(row.get("dom_title") or ""))
+            or _date_from_label(str(row.get("date_label") or ""))
+            for row in rows
+        ]
+        dates = [d for d in dates if d]
+        max_seen = max(dates) if dates else None
+        if i == 0 or i % 10 == 0 or max_seen != last_max:
+            print(f"[rtss-cdp] restore_latest iter={i} max_date={max_seen or '—'}")
+        if max_seen and max_seen >= target:
+            print(f"[rtss-cdp] restore_latest=ready max_date={max_seen}")
+            return
+        if max_seen == last_max:
+            no_progress += 1
+        else:
+            no_progress = 0
+            last_max = max_seen
+        if no_progress >= 12:
+            raise RuntimeError(
+                f"latest restore stalled before {target.isoformat()} "
+                f"(last max date {max_seen or '—'})"
+            )
+        scroll.evaluate("el => { el.scrollTop = el.scrollHeight; }")
+        page.wait_for_timeout(800)
+    raise RuntimeError(f"latest restore exceeded {max_iter} batches before {target.isoformat()}")
 
 
 def _scrollable(page):
@@ -176,11 +232,10 @@ def collect_rows(page, start: date, end: date, do_scroll: bool = True) -> list[d
     if not scroll.count():
         raise RuntimeError("RTSS message scroll container not found")
 
-    # 先由頻道目前位置回到底部，確保「今日」訊息已 render；只改 scrollTop，
-    # 不 click、不 focus 訊息，唔會觸發已讀。
+    # Probe 會把 virtualized list 推到歷史端；逐批恢復到終日，唔可以
+    # 只 assign 一次 scrollHeight，否則只會停留在舊 buffer。
     if do_scroll:
-        scroll.evaluate("el => { el.scrollTop = el.scrollHeight; }")
-        page.wait_for_timeout(500)
+        _scroll_to_latest(page, end)
 
     seen: dict[str, dict] = {}
     stable_rounds = 0
@@ -296,6 +351,11 @@ def main() -> int:
             for line in path.read_text(encoding="utf-8").splitlines():
                 try:
                     item = json.loads(line)
+                    # A previous per-day writer could leave a row under the
+                    # wrong filename after a virtualized-DOM pass.  Never
+                    # carry that cross-day contamination forward.
+                    if str(item.get("message_date") or "") != day.isoformat():
+                        continue
                     text = clean_alert_text(str(item.get("raw_text") or ""))
                     # Keep only actual alert bubbles; old raw files may contain
                     # Telegram view-count/local-time UI rows from before T1.
