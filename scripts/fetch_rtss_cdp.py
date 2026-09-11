@@ -458,6 +458,8 @@ def main() -> int:
             # I 主路線：每一日獨立跳轉；不依賴任何 restore_latest 或長距離捲動。
             for offset in range((end - start).days + 1):
                 day = start + timedelta(days=offset)
+                if day.weekday() >= 5:
+                    continue
                 rows.extend(_harvest_day(page, day))
         alert_times = []
         for row in rows:
@@ -478,6 +480,8 @@ def main() -> int:
     for row in rows:
         by_day.setdefault(row["message_date"].replace("-", ""), []).append(row)
     for day in (start + timedelta(days=i) for i in range((end - start).days + 1)):
+        if day.weekday() >= 5:
+            continue
         day_key = day.strftime("%Y%m%d")
         path = OUT_DIR / f"raw_dom_{day_key}.jsonl"
         existing: dict[str, dict] = {}
