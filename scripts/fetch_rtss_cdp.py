@@ -30,8 +30,9 @@ CDP_URL = "http://127.0.0.1:9222"
 RTSS_FRAGMENT = "2795969450"
 OUT_DIR = Path("data/rtss")
 CHECKPOINT_PATH = OUT_DIR / "backfill_ckpt.json"
-MAX_SCROLL_ROUNDS = 600
-STABLE_ROUNDS_LIMIT = 8
+MAX_SCROLL_ROUNDS = 1800
+STABLE_ROUNDS_LIMIT = 20
+SCROLL_OVERLAP_RATIO = 0.6
 TITLE_DATE_RE = re.compile(r"^(\d{1,2} [A-Za-z]+ \d{4}),")
 TIME_RE = re.compile(r"\b(\d{1,2}:\d{2}:\d{2})\b")
 
@@ -122,8 +123,10 @@ def _scroll_up(scroll, page) -> None:
     if not box:
         raise RuntimeError("RTSS message scroll container has no bounding box")
     page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
-    page.mouse.wheel(0, -1200)
-    page.wait_for_timeout(800)
+    client_height = scroll.evaluate("el => el.clientHeight")
+    step = max(1, int(client_height * SCROLL_OVERLAP_RATIO))
+    page.mouse.wheel(0, -step)
+    page.wait_for_timeout(400)
 
 
 def _message_ids(page) -> set[str]:
@@ -264,6 +267,11 @@ def collect_rows(page, start: date, end: date, do_scroll: bool = True) -> list[d
             }
 
         oldest = min(dates_seen) if dates_seen else None
+        scroll_top = scroll.evaluate("el => el.scrollTop")
+        print(
+            f"[rtss-cdp] harvest scrollTop={scroll_top} "
+            f"oldest={oldest or '—'} rows={len(seen)}"
+        )
         if len(seen) == before:
             stable_rounds += 1
         else:
@@ -289,6 +297,27 @@ def collect_rows(page, start: date, end: date, do_scroll: bool = True) -> list[d
         if start <= msg_date <= end:
             result.append(row)
     return sorted(result, key=lambda r: (r["message_date"], r["dom_title"], r["message_key"]))
+
+
+def write_density_report(rows: list[dict], start: date, end: date) -> Path:
+    """Write a complete daily count table for H's coverage acceptance."""
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    counts: dict[str, int] = {}
+    for row in rows:
+        day = str(row.get("message_date") or "")
+        if day:
+            counts[day] = counts.get(day, 0) + 1
+    path = OUT_DIR / f"rtss_density_{start:%Y%m%d}_{end:%Y%m%d}.csv"
+    lines = ["date,weekday,is_weekday,alert_count,flag\n"]
+    day = start
+    while day <= end:
+        count = counts.get(day.isoformat(), 0)
+        is_weekday = day.weekday() < 5
+        flag = "normal" if 4 <= count <= 15 else "suspicious" if count else "zero_weekday" if is_weekday else "zero_non_weekday"
+        lines.append(f"{day.isoformat()},{day.strftime('%A')},{int(is_weekday)},{count},{flag}\n")
+        day += timedelta(days=1)
+    path.write_text("".join(lines), encoding="utf-8")
+    return path
 
 
 def _date_range(args) -> tuple[date, date]:
@@ -338,6 +367,8 @@ def main() -> int:
             if row_date and time_match:
                 alert_times.append(f"{row_date.isoformat()} {time_match.group(1)}")
         print(f"[rtss-cdp] raw_rows={len(rows)} latest_alert_ts={max(alert_times) if alert_times else '—'}")
+        density_path = write_density_report(rows, start, end)
+        print(f"[rtss-cdp] density_report={density_path}")
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     by_day: dict[str, list[dict]] = {}
