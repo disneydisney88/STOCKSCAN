@@ -103,18 +103,26 @@ def _assert_client(page) -> str:
             raise RuntimeError("Telegram Web K client asserted, but .bubbles container is missing")
     else:
         raise RuntimeError(f"Unsupported Telegram Web client path: {path or '/'} (expected /a or /k)")
+    container = _scrollable(page)
+    metrics = container.evaluate("el => ({scrollHeight: el.scrollHeight, clientHeight: el.clientHeight})")
+    if metrics["scrollHeight"] <= metrics["clientHeight"]:
+        raise RuntimeError(
+            f"Telegram {client} message container is not scrollable: "
+            f"scrollHeight={metrics['scrollHeight']} clientHeight={metrics['clientHeight']}"
+        )
+    print(f"[rtss-cdp] scroll_container=verified scrollHeight={metrics['scrollHeight']} clientHeight={metrics['clientHeight']}")
     print(f"[rtss-cdp] client={client} asserted")
     return client
 
 
 def _scroll_up(scroll, page) -> None:
     """The one scroll primitive shared by history probe and backfill."""
-    scroll.evaluate("""el => {
-      const step = Math.max(600, Math.floor(el.clientHeight * 0.85));
-      el.scrollTop = Math.max(0, el.scrollTop - step);
-      el.dispatchEvent(new Event('scroll', {bubbles: true}));
-    }""")
-    page.wait_for_timeout(500)
+    box = scroll.bounding_box()
+    if not box:
+        raise RuntimeError("RTSS message scroll container has no bounding box")
+    page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+    page.mouse.wheel(0, -1200)
+    page.wait_for_timeout(800)
 
 
 def _message_ids(page) -> set[str]:
@@ -161,19 +169,20 @@ def _scrollable(page):
     ).first
 
 
-def collect_rows(page, start: date, end: date) -> list[dict]:
+def collect_rows(page, start: date, end: date, do_scroll: bool = True) -> list[dict]:
     scroll = _scrollable(page)
     if not scroll.count():
         raise RuntimeError("RTSS message scroll container not found")
 
     # 先由頻道目前位置回到底部，確保「今日」訊息已 render；只改 scrollTop，
     # 不 click、不 focus 訊息，唔會觸發已讀。
-    scroll.evaluate("el => { el.scrollTop = el.scrollHeight; }")
-    page.wait_for_timeout(500)
+    if do_scroll:
+        scroll.evaluate("el => { el.scrollTop = el.scrollHeight; }")
+        page.wait_for_timeout(500)
 
     seen: dict[str, dict] = {}
     stable_rounds = 0
-    for _ in range(MAX_SCROLL_ROUNDS):
+    for _ in range(1 if not do_scroll else MAX_SCROLL_ROUNDS):
         rows = _message_rows(page)
         before = len(seen)
         dates_seen: list[date] = []
@@ -202,6 +211,8 @@ def collect_rows(page, start: date, end: date) -> list[dict]:
             stable_rounds += 1
         else:
             stable_rounds = 0
+        if not do_scroll:
+            break
         if oldest and oldest <= start:
             break
         if stable_rounds >= STABLE_ROUNDS_LIMIT:
@@ -241,6 +252,7 @@ def main() -> int:
     ap.add_argument("--backfill", action="store_true")
     ap.add_argument("--from", dest="from_date", help="backfill 起日 YYYY-MM-DD")
     ap.add_argument("--to", dest="to_date", help="backfill 終日 YYYY-MM-DD")
+    ap.add_argument("--no-scroll", action="store_true", help="只 harvest 當前 DOM，用於診斷")
     args = ap.parse_args()
     start, end = _date_range(args)
     if start > end:
@@ -255,8 +267,9 @@ def main() -> int:
             return 1
         page = candidates[0]
         _assert_client(page)
-        _probe_history_ready(page)
-        rows = collect_rows(page, start, end)
+        if not args.no_scroll:
+            _probe_history_ready(page)
+        rows = collect_rows(page, start, end, do_scroll=not args.no_scroll)
         alert_times = []
         for row in rows:
             try:
