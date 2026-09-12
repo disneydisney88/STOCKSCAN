@@ -73,6 +73,14 @@ def _date_from_label(label: str) -> date | None:
     return None
 
 
+def _visible_date_labels(page) -> list[str]:
+    """Return visible Telegram message date separators only."""
+    return page.locator(".message-date-group .sticky-date").evaluate_all("""els => els
+      .filter(el => !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length))
+      .map(el => (el.innerText || el.textContent || '').trim())
+      .filter(Boolean)""")
+
+
 def _message_rows(page) -> list[dict]:
     """Read message text/title only; no DOM action which changes Telegram state."""
     return page.locator(".message, .Message").evaluate_all(
@@ -222,8 +230,42 @@ def _scroll_to_latest(page, target: date, max_iter: int = 300) -> None:
     raise RuntimeError(f"latest restore exceeded {max_iter} batches before {target.isoformat()}")
 
 
+def _ensure_jump_control(page) -> None:
+    """Open Telegram Web A's search panel before locating its calendar control."""
+    ctl = page.locator('[title="Jump to Date"]')
+    if ctl.count() and ctl.first.is_visible():
+        return
+    for selector in ('[title="Search"]', '[aria-label="Search"]', 'button .icon-search'):
+        button = page.locator(selector).first
+        if button.count() and button.is_visible():
+            button.click()
+            page.wait_for_timeout(500)
+            break
+    ctl = page.locator('[title="Jump to Date"]')
+    if not (ctl.count() and ctl.first.is_visible()):
+        candidates = page.evaluate("""() => [...document.querySelectorAll(
+          'button,[role="button"],[title],[aria-label]')]
+          .map(e => ({cls:String(e.className), title:e.getAttribute('title'),
+                      aria:e.getAttribute('aria-label')}))
+          .filter(o => o.title || o.aria)""")
+        raise RuntimeError(
+            f"Jump to Date control not found after opening search; candidates={candidates}"
+        )
+
+
 def _jump_to_date(page, target: date) -> None:
     """Use Telegram Web A's own calendar, then leave the list at target."""
+    # Telegram Web A currently rolls a clicked month-end 31 over to the next
+    # month's day 1 (confirmed in the live DOM for 2026-03-31/07-31).  Landing
+    # on the following day 1 loads the adjacent day 31 into the virtualized window; the
+    # caller's verify_anchor(target) still requires the real target separator.
+    picker_target = target + timedelta(days=1) if target.day == 31 else target
+    if picker_target != target:
+        print(
+            f"[rtss-cdp] calendar_day31_workaround target={target.isoformat()} "
+            f"picker_target={picker_target.isoformat()}"
+        )
+    before_labels = _visible_date_labels(page)
     # A prior interrupted/manual probe may leave the calendar modal open.
     # Close that stale backdrop before opening a fresh picker.
     stale_close = page.locator("#portals [title='Close'], .modal-backdrop").first
@@ -236,31 +278,121 @@ def _jump_to_date(page, target: date) -> None:
             page.wait_for_timeout(200)
         except PlaywrightTimeoutError:
             pass
-    page.locator('[title="Jump to Date"]').first.click()
+    _ensure_jump_control(page)
+    ctl = page.locator('[title="Jump to Date"]').first
+    ctl.wait_for(state="visible", timeout=3000)
+    ctl.click()
     page.wait_for_timeout(300)
-    month_name = target.strftime("%B %Y")
+    month_name = picker_target.strftime("%B %Y")
     for _ in range(24):
-        if page.get_by_text(month_name, exact=True).count():
+        portal = page.locator("#portals")
+        lines = [line.strip() for line in portal.inner_text().splitlines() if line.strip()]
+        current_month_name = lines[0] if lines else ""
+        if current_month_name == month_name:
             break
-        prev = page.locator("button").filter(has=page.locator(".icon-previous")).last
-        if not prev.count():
-            raise RuntimeError(f"Telegram date picker has no previous-month control for {month_name}")
-        prev.click()
+        try:
+            current_month = datetime.strptime(current_month_name, "%B %Y").date()
+        except ValueError as exc:
+            raise RuntimeError(
+                f"Telegram date picker month heading is unreadable: {current_month_name!r}"
+            ) from exc
+        direction = "previous" if current_month > picker_target else "next"
+        arrow = portal.locator(
+            f"button:has(.icon-{direction}), "
+            f"button:has(.icon-{'left' if direction == 'previous' else 'right'})"
+        ).first
+        if not arrow.count() or arrow.is_disabled():
+            print(
+                f"[rtss-cdp] calendar_boundary target_month={month_name} "
+                f"direction={direction} control=missing_or_disabled"
+            )
+            return
+        arrow.click()
         page.wait_for_timeout(100)
     else:
         raise RuntimeError(f"Telegram date picker could not reach {month_name}")
-    day_buttons = page.locator("button.day-button").filter(has_text=str(target.day))
-    enabled = [day_buttons.nth(i) for i in range(day_buttons.count())
-               if not day_buttons.nth(i).is_disabled()]
-    if not enabled:
-        raise RuntimeError(f"Telegram date picker has no enabled day {target.day} for {month_name}")
-    enabled[0].click()
-    confirm = page.locator("#portals button").filter(has_text="Jump to Date").last
-    if not confirm.count():
-        raise RuntimeError("Telegram date picker confirmation button not found")
+    # Keep one live locator narrowed by exact text; Telegram re-renders the
+    # calendar while Playwright inspects it, so saved nth() locators are unsafe.
+    day_buttons = portal.locator("button.day-button").filter(
+        has_text=re.compile(rf"^{picker_target.day}$")
+    )
+    target_button = day_buttons.first
+    if not target_button.count() or target_button.is_disabled():
+        raise RuntimeError(
+            f"Telegram date picker has no enabled day {picker_target.day} for {month_name}"
+        )
+    target_button.click()
+    page.wait_for_timeout(300)
+    selected_days = portal.locator("button.day-button.selected").all_inner_texts()
+    print(
+        f"[rtss-cdp] calendar_selection target={target.isoformat()} "
+        f"month={month_name} selected={selected_days} before={before_labels}"
+    )
+    confirm = portal.locator("button.Button.default.primary").filter(
+        has_text=re.compile(r"^Jump to Date$")
+    )
+    visible_confirms = [
+        confirm.nth(i) for i in range(confirm.count()) if confirm.nth(i).is_visible()
+    ]
+    if len(visible_confirms) != 1:
+        details = portal.locator("button").evaluate_all("""els => els.map(el => ({
+          cls: String(el.className), text: (el.textContent || '').trim(),
+          title: el.getAttribute('title'), top: el.getBoundingClientRect().top,
+          visible: !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length)
+        }))""")
+        raise RuntimeError(
+            f"Telegram date picker confirmation button is ambiguous; buttons={details}"
+        )
+    confirm = visible_confirms[0]
     confirm.click()
-    page.wait_for_timeout(1200)
+    try:
+        confirm.wait_for(state="hidden", timeout=3000)
+    except PlaywrightTimeoutError as exc:
+        raise RuntimeError("Jump to Date confirmation did not close the calendar") from exc
+    changed = False
+    after_labels = before_labels
+    for _ in range(20):
+        page.wait_for_timeout(250)
+        after_labels = _visible_date_labels(page)
+        if after_labels != before_labels:
+            changed = True
+            break
+    if not changed:
+        raise RuntimeError(
+            f"Jump to Date did not change visible DOM dates: "
+            f"target={target.isoformat()} labels={after_labels}"
+        )
+    print(
+        f"[rtss-cdp] jump_date_changed target={target.isoformat()} "
+        f"before={before_labels} after={after_labels}"
+    )
     print(f"[rtss-cdp] jump_date=ready target={target.isoformat()}")
+
+
+def verify_anchor(page, target: date, timeout_ms: int = 5000) -> bool:
+    """Verify the calendar jump landed on the requested date.
+
+    A successful calendar click is not evidence that the virtualized message
+    list contains the requested day.  Callers must treat False as
+    ``ANCHOR_FAILED`` and must never turn it into a zero-count observation.
+    """
+    labels: list[str] = []
+    seen: set[date] = set()
+    deadline = time.monotonic() + timeout_ms / 1000
+    while time.monotonic() < deadline:
+        labels = _visible_date_labels(page)
+        seen = {_date_from_label(label) for label in labels}
+        seen.discard(None)
+        if target in seen:
+            break
+        page.wait_for_timeout(250)
+    ok = target in seen
+    print(
+        f"[rtss-cdp] verify_anchor target={target.isoformat()} "
+        f"ok={int(ok)} labels={json.dumps(labels, ensure_ascii=True)} "
+        f"seen={[d.isoformat() for d in sorted(seen)]}"
+    )
+    return ok
 
 
 def _scroll_down(scroll, page) -> None:
