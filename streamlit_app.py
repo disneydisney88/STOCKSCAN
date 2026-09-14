@@ -75,9 +75,9 @@ def data_asof(df: pd.DataFrame) -> str:
     return str(df["scan_time"].dropna().max())[:16]
 
 
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs(
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = st.tabs(
     ["📊 收市爆量榜（訊號A）", "⚡ 即市掃描（訊號B）", "🔬 對照 RTSS", "🗂 歷史面板", "📈 事件率",
-     "🔎 個股研究", "9️⃣ RTSS 對照", "🐤 春江鴨", "🧩 L 型候選"])
+     "🔎 個股研究", "9️⃣ RTSS 對照", "🐤 春江鴨", "🧩 L 型候選", "📕 追蹤簿"])
 
 with tab1:
     files = [f for f in eod_files() if f.name not in {"radar_eod_panel.csv", "radar_eod_panel_full.csv"}]
@@ -417,6 +417,85 @@ with tab9:
             show = ldf if stage == "全部" else ldf[ldf["l_shape_stage"] == stage]
             st.caption(f"{l_files[0].name}　{len(show)}/{len(ldf)} 隻")
             st.dataframe(show, use_container_width=True, height=800, hide_index=True)
+
+with tab10:
+    # ── P6 追蹤簿：上榜嗰刻起追 t+5/10/20/60（規格書 §5）──
+    st.caption("追蹤簿：每股由上榜嗰刻起追 t+5/10/20/60 價格變化（收市對收市，M2 快取）。"
+               "entry_intraday 暫用同日收市做代理（eod_proxy）；合股／拆股跳空窗口嘅 ret 已標 _est=1。"
+               "只列數字，不構成投資建議。")
+    tf = read_csv_if_exists(DATA_DIR / "reports" / "tracking_first.csv")
+    te = read_csv_if_exists(DATA_DIR / "reports" / "tracking_each.csv")
+    tsum = read_csv_if_exists(DATA_DIR / "reports" / "tracking_summary.csv")
+    if tf.empty or te.empty:
+        st.info("未有追蹤簿。跑：`python scripts/build_tracking.py`")
+    else:
+        book_pick = st.selectbox(
+            "揀簿", ["簿A・首次入冊（每股一筆）", "簿B・每次入冊（每上榜日一筆）"], key="trk_book")
+        book_key = "first" if book_pick.startswith("簿A") else "each"
+        df = tf if book_key == "first" else te
+        grp_pick = st.selectbox(
+            "揀組", ["全部", "有財技（上榜後180日內 GO/供股/配股/合股/CB）", "冇財技"], key="trk_grp")
+        if grp_pick.startswith("有"):
+            show = df[df["has_capital_action"] == 1]
+        elif grp_pick.startswith("冇"):
+            show = df[df["has_capital_action"] == 0]
+        else:
+            show = df
+
+        # 摘要卡：兩組 t20 中位對比（只計非 _est）
+        if not tsum.empty:
+            s20 = tsum[(tsum["book"] == book_key) & (tsum["horizon"] == "t20")]
+            med = {r["group"]: r["median_ret_pct"] for _, r in s20.iterrows()}
+            n = {r["group"]: r["n_clean"] for _, r in s20.iterrows()}
+
+            def _fmt(v):
+                return f"{float(v):+.2f}%" if v not in ("", None) and str(v) != "nan" else "—"
+            c1, c2, c3 = st.columns(3)
+            c1.metric("t20 中位・有財技", _fmt(med.get("with_ca")),
+                      f"n={n.get('with_ca', 0)}（非_est）")
+            c2.metric("t20 中位・冇財技", _fmt(med.get("without_ca")),
+                      f"n={n.get('without_ca', 0)}（非_est）")
+            c3.metric("t20 中位・全部", _fmt(med.get("all")),
+                      f"n={n.get('all', 0)}（非_est）")
+            st.caption("中位數只計 ret_t20 非 _est 行；_est 行數見 tracking_summary.csv n_est 欄。")
+
+        st.subheader(f"明細（{len(show)} 行）")
+        st.dataframe(show, use_container_width=True, height=520, hide_index=True)
+
+        # 個股 drill-down：所有上榜日 + 價格路徑
+        st.subheader("個股 drill-down")
+        from stockscan import kline_cache
+        codes = sorted(show["code5"].astype(str).unique())
+        if codes:
+            pick = st.selectbox(
+                "揀股", codes,
+                format_func=lambda c: f"{c} {df.loc[df['code5'] == c, 'name'].iloc[0]}",
+                key="trk_code")
+            rows = te[te["code5"] == pick].sort_values("scan_date")
+            st.caption(f"{pick} 共上榜 {len(rows)} 次（簿B 逐筆）")
+            st.dataframe(rows, use_container_width=True, height=420, hide_index=True)
+            kdf = kline_cache.load(pick)
+            if kdf is not None and not kdf.empty:
+                kdf = kdf.copy()
+                kdf["date_dt"] = pd.to_datetime(kdf["date"])
+                chart = kdf.set_index("date_dt")[["close"]]
+                st.line_chart(chart, height=260)
+                entry_pts = kdf[kdf["date"].isin(set(rows["scan_date"]))]
+                if not entry_pts.empty:
+                    st.scatter_chart(entry_pts.set_index("date_dt")[["close"]], height=260)
+                st.caption(f"快取價格路徑 {kdf['date'].iloc[0]}→{kdf['date'].iloc[-1]}；"
+                           f"散點＝上榜日收市（entry_close）")
+
+        # L 型版本子區
+        st.subheader("L 型版本對比（季度）")
+        ldiff = read_csv_if_exists(DATA_DIR / "reports" / "l_shape_version_diff.csv")
+        if not ldiff.empty:
+            st.caption("新入／畢業（開始配股表演）／跌出——只列名單變化。")
+            st.dataframe(ldiff, use_container_width=True, height=300, hide_index=True)
+        for qcsv in sorted((DATA_DIR / "reports").glob("l_shape_20*_Q*.csv")):
+            with st.expander(f"📄 {qcsv.name}"):
+                st.dataframe(read_csv_if_exists(qcsv), use_container_width=True, height=300,
+                             hide_index=True)
 
 if UNIVERSE_CSV.exists():
     uni = read_csv_if_exists(UNIVERSE_CSV)
