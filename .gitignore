@@ -30,3 +30,6 @@ data/raw/
 
 # RTSS 第三方頻道原始文字：只留 Drive 工作夾，唔公開 push
 data/rtss/
+
+# P6 交收副本：tracking/ 係 copy 去 Drive 交收夾嘅副本，正印喺 data/reports/
+tracking/

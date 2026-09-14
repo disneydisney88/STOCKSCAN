@@ -382,3 +382,53 @@ pytest -q                                      # 49 tests 全綠
 
 Telegram 推送真開；「當日第 N 次」前瞻力用自家＋RTSS 對照數據驗證（等 T 部分儲夠 20 交易日）；
 人物網絡自動連結；完整 Round 4 五訊號 morning brief。
+
+## 18. 第六階段：追蹤簿（zcode，2026-09-14）
+
+規格書：`claude_STOCKSCAN_zcode任務規格書_第六階段_追蹤簿_v2_20260912.md`（§0b PATH／§0c 資料源照辦，
+全本地計，無拉新數據：M2 快取 2,874 檔已夠覆蓋，`price_missing=0`，Longbridge/Webb-site/CCASS 都冇動用到）。
+開工前基線 pytest **67 passed**。規格書要求進度寫 §17，但 §17 已有內容，故記喺呢節 §18。
+
+### 模組 × commit
+
+| 模組 | commit | 產物 |
+|---|---|---|
+| 簿A/簿B/摘要 | `59e731b` | `scripts/build_tracking.py` → `data/reports/tracking_first.csv`（1,226 行）／`tracking_each.csv`（4,036 行）／`tracking_summary.csv`（64 行） |
+| tab 追蹤簿 | `b56d6f6` | `streamlit_app.py` 第 10 個 tab「📕 追蹤簿」——規格書寫 tab 7，但 tab7 位置已被「RTSS 對照」用咗，故加做 tab10 |
+| L 型季度版本 | `5d9292f` | `scripts/refresh_l_shape.py` → `l_shape_{2025Q3..2026Q3}.csv` 5 版＋`l_shape_version_diff.csv`（91 行）；交叉核對 data/raw 兩隻 KL xlsx（`in_kl_xlsx` 欄） |
+| 反覆上榜 | `deb18df` | `scripts/analyze_recurrence.py` → `recurrence_20260914.csv`（1,226 隻） |
+
+### 口徑（唔准估嘅位）
+
+- 入冊價兩個都記：`entry_close`（面板收市）＋`entry_intraday`（同值，`entry_intraday_note='eod_proxy'`，等 daemon 即市數據先補真值）
+- ret_tN＝收市對收市，tN 用**該股自己快取嘅第 N 個交易日**；近期上榜未夠 60 日 → `days_available` 標明
+- 合股／拆股跳空：用 events.db `key_date_1`（生效日，覆蓋 57/60）跌喺（上榜日, tN日] → 該 ret `_est=1`；
+  **summary 中位／勝率只計非 _est 行**，_est 行數喺 `n_est` 欄
+- 有財技＝上榜日起 180 **日曆日**內 GO/RIGHTS/PLACING/CONSOLIDATION/CB 任一；`fu_placing` 包埋 PLACING_AGENT
+- 反覆上榜 run 定義：喺全局交易日曆上貼住上一個上榜日＝同一 run
+- L 型 as-of 快照：universe＝scan_date≤季末嘅已上榜股；2026Q3 as-of=09-14（季末未到）；每季首個交易日重跑 refresh_l_shape.py
+
+### 核心數字（只列數字，結論留 KL/Claude）
+
+- **簿A（首次入冊）t20 中位：有財技 +0.3822%（n_clean=167）vs 冇財技 −1.6393%（n_clean=1,025），差 +2.02pp**；
+  t60：+1.9053%（162）vs −4.4776%（963），差 +6.38pp
+- 簿B（每次入冊）t20：−1.2195%（661）vs −2.5000%（3,075）；t60：−1.6349%（590）vs −6.5574%（2,633）
+- 勝率（t20）：簿A 有財技 0.5030 vs 冇財技 0.4332；簿B 0.4599 vs 0.4101
+- 反覆上榜×財技（首次入冊口徑 t20 中位）：單次×有財技 +3.83（n=17）／單次×冇 −3.87（n=266）；
+  ≥5次×有財技 +1.55（n=61）／≥5次×冇 0.00（n=231）；上榜 ≥2 次共 941 隻（76.8%）、跨季 823、跨年 652
+- L 型候選演變：13（25Q3）→29（25Q4）→26（26Q1）→20（26Q2）→22（26Q3）；畢業_開始配供 共 10 隻次
+- 驗收：08368 簿B=18 行✓；簿A 每股一行✓；08368 首日 ret_t5=−13.0% 手動對快取一致✓；est 旗標 t60=47 行✓
+
+### 報表交收
+
+`G:\我的雲端硬碟\STOCKSCAN\tracking\`（規格書指明嘅交收夾子夾）已 copy：tracking_first／tracking_each／
+tracking_summary／l_shape_version_diff／recurrence_20260914.csv＋5 個季度 l_shape 檔，等 Claude 讀。
+
+### 其他
+
+- Drive `.git` 又中 `unable to append to '.git/logs/HEAD'`（§5.7b）——已照 git 提示 set
+  `windows.appendAtomically false` 後正常，commit 冇壞
+- 舊 `l_shape_candidates_20260909.csv`（23 等表演）vs 新 2026Q3（22）：只有 01940 跌出（GO 03-13 老化出 180 日窗），一致
+- 最終 pytest：**67 passed**（09-14，同基線一樣全綠）
+
+*本節及所有產出只供學術研究及風險分析，不構成投資建議。*
