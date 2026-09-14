@@ -8,9 +8,12 @@ from __future__ import annotations
 
 import json
 import os
+import queue
 import shutil
 import subprocess
 import sys
+import threading
+import time
 import urllib.error
 import urllib.request
 from datetime import date, datetime, timedelta
@@ -101,25 +104,127 @@ def _append_stderr_log(label: str, stderr: str) -> None:
             handle.write("\n")
 
 
-def run_script(label: str, args: list[str], output_box) -> tuple[bool, str]:
-    command = [sys.executable, *args]
-    command_text = " ".join(command)
-    output_box.write(f"▶ {label}\nCOMMAND: {command_text}")
-    try:
-        result = subprocess.run(command, cwd=ROOT, text=True, capture_output=True, timeout=900)
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        output_box.error(f"{label} 未能完成：{exc}")
-        return False, str(exc)
-    stdout = result.stdout or ""
-    stderr = result.stderr or ""
+def _read_pipe(stream, output_queue: queue.Queue[str]) -> None:
+    for line in iter(stream.readline, ""):
+        output_queue.put(line)
+    stream.close()
+
+
+def _render_process_output(output_box, command_text: str, stdout_lines: list[str]) -> None:
+    stdout = "".join(stdout_lines)
     output_box.code(
         f"COMMAND: {command_text}\n\n{stdout[-6000:]}" if stdout.strip()
         else f"COMMAND: {command_text}"
     )
-    if result.returncode:
+
+
+def _kill_process_tree(process: subprocess.Popen) -> None:
+    """Kill the console step and descendants so Windows leaves no orphan."""
+    if os.name == "nt":
+        subprocess.run(
+            ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+            cwd=ROOT,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+        if process.poll() is None:
+            process.kill()
+    else:
+        process.kill()
+
+
+def run_script(
+    label: str,
+    args: list[str],
+    output_box,
+    *,
+    timeout_s: int = 300,
+    progress=None,
+    progress_fraction: float = 0.0,
+) -> tuple[bool, str]:
+    command = [sys.executable, *args]
+    command_text = " ".join(command)
+    output_box.write(f"▶ {label}\nCOMMAND: {command_text}\nTIMEOUT: {timeout_s}s")
+    started = time.monotonic()
+    last_progress = -5.0
+    try:
+        process = subprocess.Popen(
+            command,
+            cwd=ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            bufsize=1,
+        )
+    except OSError as exc:
+        output_box.error(f"{label} 未能完成：{exc}")
+        return False, str(exc)
+
+    stdout_queue: queue.Queue[str] = queue.Queue()
+    stderr_queue: queue.Queue[str] = queue.Queue()
+    threads = [
+        threading.Thread(target=_read_pipe, args=(process.stdout, stdout_queue), daemon=True),
+        threading.Thread(target=_read_pipe, args=(process.stderr, stderr_queue), daemon=True),
+    ]
+    for thread in threads:
+        thread.start()
+    stdout_lines: list[str] = []
+    stderr_lines: list[str] = []
+    timed_out = False
+    while process.poll() is None or any(thread.is_alive() for thread in threads):
+        while True:
+            try:
+                stdout_lines.append(stdout_queue.get_nowait())
+            except queue.Empty:
+                break
+        while True:
+            try:
+                stderr_lines.append(stderr_queue.get_nowait())
+            except queue.Empty:
+                break
+        elapsed = time.monotonic() - started
+        if stdout_lines:
+            _render_process_output(output_box, command_text, stdout_lines)
+        if progress is not None and elapsed - last_progress >= 5:
+            progress.progress(progress_fraction, text=f"{label} · elapsed {elapsed:.0f}s / timeout {timeout_s}s")
+            last_progress = elapsed
+        if elapsed >= timeout_s and process.poll() is None:
+            timed_out = True
+            _kill_process_tree(process)
+            break
+        time.sleep(0.1)
+    process.wait()
+    for thread in threads:
+        thread.join(timeout=2)
+    while True:
+        try:
+            stdout_lines.append(stdout_queue.get_nowait())
+        except queue.Empty:
+            break
+    while True:
+        try:
+            stderr_lines.append(stderr_queue.get_nowait())
+        except queue.Empty:
+            break
+    stdout = "".join(stdout_lines)
+    stderr = "".join(stderr_lines)
+    _render_process_output(output_box, command_text, stdout_lines)
+    if progress is not None:
+        elapsed = time.monotonic() - started
+        progress.progress(progress_fraction, text=f"{label} · elapsed {elapsed:.0f}s")
+    if timed_out:
         _append_stderr_log(label, stderr)
         with output_box.container():
-            st.error(f"{label} 失敗（exit {result.returncode}）")
+            st.error(f"{label} TIMEOUT（>{timeout_s}s，process 已 kill）")
+            st.caption(f"完整 stderr 已 append：{CONSOLE_ERROR_LOG}")
+            stderr_tail = "\n".join(stderr.splitlines()[-20:]) or "(stderr 空白)"
+            st.code(f"COMMAND: {command_text}\n\nSTDERR (tail 20 lines):\n{stderr_tail}", language="text")
+        return False, stderr
+    if process.returncode:
+        _append_stderr_log(label, stderr)
+        with output_box.container():
+            st.error(f"{label} 失敗（exit {process.returncode}）")
             st.caption(f"完整 stderr 已 append：{CONSOLE_ERROR_LOG}")
             stderr_tail = "\n".join(stderr.splitlines()[-20:]) or "(stderr 空白)"
             st.code(f"COMMAND: {command_text}\n\nSTDERR (tail 20 lines):\n{stderr_tail}", language="text")
@@ -136,7 +241,10 @@ def run_pipeline(day: date, output_box, progress=None) -> bool:
     for index, (label, args) in enumerate(steps, 1):
         if progress:
             progress.progress((index - 1) / len(steps), text=label)
-        ok, _ = run_script(label, args, output_box)
+        ok, _ = run_script(
+            label, args, output_box, timeout_s=300,
+            progress=progress, progress_fraction=(index - 1) / len(steps),
+        )
         if not ok:
             if progress:
                 progress.progress((index - 1) / len(steps), text=f"停止：{label}")
@@ -155,13 +263,20 @@ def run_range(start: date, end: date, output_box, progress=None) -> bool:
     for index, (label, args) in enumerate(commands, 1):
         if progress:
             progress.progress((index - 1) / (total + 2), text=label)
-        ok, _ = run_script(label, args, output_box)
+        ok, _ = run_script(
+            label, args, output_box, timeout_s=180,
+            progress=progress, progress_fraction=(index - 1) / (total + 2),
+        )
         if not ok:
             return False
     for offset in range(total):
         day = start + timedelta(days=offset)
         label = f"3/3 對照 {day.isoformat()}（{offset + 1}/{total}）"
-        ok, _ = run_script(label, ["scripts/compare_rtss_daily.py", "--date", day.isoformat()], output_box)
+        ok, _ = run_script(
+            label, ["scripts/compare_rtss_daily.py", "--date", day.isoformat()], output_box,
+            timeout_s=180, progress=progress,
+            progress_fraction=(offset + 2) / (total + 2),
+        )
         if not ok:
             return False
         if progress:
@@ -330,6 +445,7 @@ if import_run:
             "匯入 RTSS 歷史",
             ["scripts/import_rtss_backfill.py", "--source", source, "--from", import_from.isoformat(), "--to", import_to.isoformat()],
             box,
+            timeout_s=180,
         )
         if ok:
             st.success("歷史匯入完成；產物仍留喺 gitignored data/rtss/。")

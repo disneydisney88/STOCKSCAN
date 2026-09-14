@@ -309,6 +309,7 @@ pytest -q                                      # 49 tests 全綠
 - 功能閘嘗試跳到已知有訊息日 2026-09-11 時，沿用既有 `_jump_to_date` 報 `Jump to Date control not found`（K DOM 不提供 A selector）。結果標 **BLOCKED**；未進入三日 harvest、未改日曆、未開 O2。
 - 2026-09-14：BUG 2 修正只以解析後的 `target in after_dates` 作 post-click 成功條件，移除 `after_labels != before_labels` 間接判準；新增星期五同日 label unit test。三次驗證均有實際 harvest：09-11=5、08-14=3、09-04→09-14 跨日非零（09-04=11、09-07=8、09-08=13、09-09=14、09-10=8、09-11=5、09-14=2）。全套 pytest **67 passed**。
 - 同日 console「抓今日 RTSS」已成功完成 fetch → build → compare，2026-09-14 抓到 2 條；`console_err.log` 為 append、失敗紅框顯示 stderr 尾 20 行。Web A `tt-media` 尚待本項後續 O1 映射驗收正式處理。
+- 2026-09-14 console 執行器強化：抓今日每步 timeout **300 秒**；補抓範圍及每日 compare 每步 **180 秒**。stdout 逐行 stream，progress 每 5 秒更新 elapsed；Windows timeout 用 `taskkill /PID /T /F` 並以 `process.kill()` fallback，避免 Playwright 子 process 殘留。整合測試確認 `TIMEOUT` 紅框、command 顯示、stdout stream 及 5 秒 elapsed 更新；全套 pytest **67 passed**。
 
 
 ## 14. 第五階段 A2：即市上雲（zcode，2026-09-09 深夜）——等 KL 貼 env 即著
