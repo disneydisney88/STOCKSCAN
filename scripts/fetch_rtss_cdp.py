@@ -351,10 +351,18 @@ def _jump_to_date(page, target: date) -> None:
         raise RuntimeError("Jump to Date confirmation did not close the calendar") from exc
     changed = False
     after_labels = before_labels
+    after_dates: set[date] = set()
     for _ in range(20):
         page.wait_for_timeout(250)
         after_labels = _visible_date_labels(page)
-        if after_labels != before_labels:
+        after_dates = {
+            parsed for label in after_labels
+            if (parsed := _date_from_label(label)) is not None
+        }
+        # The absolute target date is the only success criterion.  A changed
+        # DOM can still be the wrong day, so visual movement is not evidence
+        # of a correct landing (verify_anchor remains the later hard gate).
+        if target in after_dates:
             changed = True
             break
     if not changed:
@@ -364,7 +372,8 @@ def _jump_to_date(page, target: date) -> None:
         )
     print(
         f"[rtss-cdp] jump_date_changed target={target.isoformat()} "
-        f"before={before_labels} after={after_labels}"
+        f"before={before_labels} after={after_labels} absolute_dates="
+        f"{[d.isoformat() for d in sorted(after_dates)]}"
     )
     print(f"[rtss-cdp] jump_date=ready target={target.isoformat()}")
 
@@ -551,7 +560,10 @@ def write_density_report(rows: list[dict], start: date, end: date) -> Path:
 
 
 def _date_range(args) -> tuple[date, date]:
-    if args.backfill:
+    # Supplying an explicit range is itself a range run.  Previously the
+    # parser only consumed --from/--to when --backfill was also present, so
+    # the documented command silently fell back to today_hkt().
+    if args.backfill or args.from_date or args.to_date:
         if not args.from_date or not args.to_date:
             raise SystemExit("--backfill 必須同時提供 --from YYYY-MM-DD --to YYYY-MM-DD")
         return date.fromisoformat(args.from_date), date.fromisoformat(args.to_date)
@@ -573,6 +585,7 @@ def main() -> int:
     start, end = _date_range(args)
     if start > end:
         raise SystemExit("--from 不可晚於 --to")
+    print(f"[rtss-cdp] target={start.isoformat()}")
 
     with sync_playwright() as pw:
         browser = pw.chromium.connect_over_cdp(CDP_URL)
@@ -646,7 +659,7 @@ def main() -> int:
         print(f"[rtss-cdp] {day_key}: {len(existing)} raw text messages -> {path}")
         if not existing:
             print(f"[rtss-cdp] WARNING: no RTSS text messages found for {day_key}", file=sys.stderr)
-        if args.backfill:
+        if args.backfill or args.from_date or args.to_date:
             checkpoint = {"completed_dates": [], "last_message_id": ""}
             if CHECKPOINT_PATH.exists():
                 try:

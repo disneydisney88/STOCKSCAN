@@ -19,7 +19,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from stockscan.io_utils import today_hkt
+from stockscan.io_utils import now_hkt, today_hkt
 
 
 ROOT = Path(__file__).resolve().parent
@@ -30,6 +30,9 @@ INTRADAY_DIR = DATA_DIR / "intraday"
 DEFAULT_EXPORTER = Path(r"C:\TGWebExporter\RTSS_Output\rtss_messages.sqlite")
 DEFAULT_DRIVE = Path(r"G:\我的雲端硬碟\RTSS\RTSS_TG")
 DRIVE_FOLDER_ID = "1H0I2YUQn1_JRN1O3zBZUepm88YAarKpx"
+# Windows rejects a directory component ending in dots; interpret the
+# requested ``zcode..\console_err.log`` destination as the zcode console log.
+CONSOLE_ERROR_LOG = Path(r"G:\我的雲端硬碟\RTSS\zcode\console_err.log")
 CDP_VERSION_URL = "http://127.0.0.1:9222/json/version"
 CDP_LIST_URL = "http://127.0.0.1:9222/json/list"
 
@@ -88,21 +91,40 @@ def open_chrome() -> tuple[bool, str]:
     return True, "已要求 Chrome 開啟；請等幾秒再撳「重新檢查」。"
 
 
+def _append_stderr_log(label: str, stderr: str) -> None:
+    CONSOLE_ERROR_LOG.parent.mkdir(parents=True, exist_ok=True)
+    stamp = now_hkt().isoformat()
+    with CONSOLE_ERROR_LOG.open("a", encoding="utf-8") as handle:
+        handle.write(f"\n===== {stamp} | {label} =====\n")
+        handle.write(stderr or "(stderr 空白)\n")
+        if stderr and not stderr.endswith("\n"):
+            handle.write("\n")
+
+
 def run_script(label: str, args: list[str], output_box) -> tuple[bool, str]:
     command = [sys.executable, *args]
-    output_box.write(f"▶ {label}\nCOMMAND: {' '.join(command)}")
+    command_text = " ".join(command)
+    output_box.write(f"▶ {label}\nCOMMAND: {command_text}")
     try:
         result = subprocess.run(command, cwd=ROOT, text=True, capture_output=True, timeout=900)
     except (OSError, subprocess.TimeoutExpired) as exc:
         output_box.error(f"{label} 未能完成：{exc}")
         return False, str(exc)
-    text = "\n".join(part for part in (result.stdout, result.stderr) if part).strip()
-    if text:
-        output_box.code(text[-6000:])
+    stdout = result.stdout or ""
+    stderr = result.stderr or ""
+    output_box.code(
+        f"COMMAND: {command_text}\n\n{stdout[-6000:]}" if stdout.strip()
+        else f"COMMAND: {command_text}"
+    )
     if result.returncode:
-        output_box.error(f"{label} 失敗（exit {result.returncode}）")
-        return False, text
-    return True, text
+        _append_stderr_log(label, stderr)
+        with output_box.container():
+            st.error(f"{label} 失敗（exit {result.returncode}）")
+            st.caption(f"完整 stderr 已 append：{CONSOLE_ERROR_LOG}")
+            stderr_tail = "\n".join(stderr.splitlines()[-20:]) or "(stderr 空白)"
+            st.code(f"COMMAND: {command_text}\n\nSTDERR (tail 20 lines):\n{stderr_tail}", language="text")
+        return False, stderr
+    return True, stdout
 
 
 def run_pipeline(day: date, output_box, progress=None) -> bool:
