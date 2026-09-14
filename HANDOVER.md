@@ -299,6 +299,13 @@ pytest -q                                      # 49 tests 全綠
 - 09-10 數據質量修補：`clean_alert_text()` 清除 Telegram 尾部 view count／瀏覽器本地時間（如 `77 02:48`），CDP 只接受有 `.text-content`／`.translatable-message` 的訊息泡，並清理既有 raw 檔中的純 UI 行（如 `77 04:31`）。parser 以 `📈` 後至 `(HK.xxxxx)` 前取 name；無 emoji 的舊 DOM 亦會先隔走標題行。
 - 實測：01555 `alert_ts=2026-09-10 09:48:37`（HKT）、name=`MI能源`、raw_text 不含 `02:48`；重抓後 raw **7** 條，build **7** 行（`parse_failed=0`，舊 CSV 殘留 UI 行亦已清走），全套 pytest **63 passed**。09-10 產物已重送唯一 `RTSS_TG` 目標。
 
+### 15.2 補充 O／O1 原圖映射（2026-09-14）
+
+- 新增 `scripts/rtss_media_map.py` 及 `stockscan/rtss_board_ocr.py`：只讀現有 Chrome CDP，逐日沿用 `fetch_rtss_cdp.py::_jump_to_date`，由圖前文字解析四類榜別及 `threshold_x`。
+- 四條配對方法均在程式內獨立記錄：DOM direct、Telegram state、Cache Storage response bytes SHA-256、最後才是 cache request order（`LOW`）。只有 bytes 精確相同先標 `HIGH`，不以順序猜測冒充高信心。
+- O1 驗收日 2026-04-17、2026-05-13、2026-08-05 未能完成：Chrome CDP 可連，client／scroll container assert 通過，但 Telegram 顯示 `waiting for network`；日曆選取後可見 DOM 仍為 `Wednesday/Thursday/Friday/Saturday/Yesterday`，既未驗證目標 anchor，亦未產生 mapping CSV。按規格標 **BLOCKED**，未開 O2。
+- 本輪本地驗證：`python -m pytest -q --basetemp=.pytest-tmp-o1-final` → **64 passed**；無 `data/rtss/media/` 檔案加入 commit。
+
 
 ## 14. 第五階段 A2：即市上雲（zcode，2026-09-09 深夜）——等 KL 貼 env 即著
 
