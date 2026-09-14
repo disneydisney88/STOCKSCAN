@@ -428,6 +428,9 @@ tracking_summary／l_shape_version_diff／recurrence_20260914.csv＋5 個季度 
 
 - Drive `.git` 又中 `unable to append to '.git/logs/HEAD'`（§5.7b）——已照 git 提示 set
   `windows.appendAtomically false` 後正常，commit 冇壞
+- Drive `.git` 偽 ref（§15 嗰個）：`.git/` 入面俾 Drive 塞咗 `desktop.ini`，`git fetch` 會報
+  `bad object refs/desktop.ini`。修復：`find .git -name desktop.ini -delete`（純 Drive metadata，
+  唔係 git 嘢，刪咗 fetch/push 即返生；09-14 已修＋已 push `a1061b4..c02c8e9`，Drive 之後可能再生，照刪得）
 - 舊 `l_shape_candidates_20260909.csv`（23 等表演）vs 新 2026Q3（22）：只有 01940 跌出（GO 03-13 老化出 180 日窗），一致
 - 最終 pytest：**67 passed**（09-14，同基線一樣全綠）
 
