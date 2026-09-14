@@ -311,6 +311,45 @@ pytest -q                                      # 49 tests 全綠
 - 同日 console「抓今日 RTSS」已成功完成 fetch → build → compare，2026-09-14 抓到 2 條；`console_err.log` 為 append、失敗紅框顯示 stderr 尾 20 行。Web A `tt-media` 尚待本項後續 O1 映射驗收正式處理。
 - 2026-09-14 console 執行器強化：抓今日每步 timeout **300 秒**；補抓範圍及每日 compare 每步 **180 秒**。stdout 逐行 stream，progress 每 5 秒更新 elapsed；Windows timeout 用 `taskkill /PID /T /F` 並以 `process.kill()` fallback，避免 Playwright 子 process 殘留。整合測試確認 `TIMEOUT` 紅框、command 顯示、stdout stream 及 5 秒 elapsed 更新；全套 pytest **67 passed**。
 
+### 15.3 補抓範圍兩項實測 + jump 可靠性修復（2026-09-14/15 zcode，KL 監督下通過後 commit）
+
+**KL 指定實測清單——兩項全過：**
+
+1. **補抓範圍 09/07–09/14 實測**：console 撳「🗓️ 補抓範圍」，
+   progress text elapsed 實錄逐 5 秒跳：0→5→10→15→20→25→30→35→40→45→50→55→60→65→70→75→80→…→136s；
+   fetch stdout 逐日 `jump_date_changed` + `jump_date=ready` 齊現（09-07/08/09/10/11/14 六日全 landing，
+   `raw_rows=33`）；整條 fetch → build → 8 日 compare 完成（「完成：8 日」），
+   產物 `data/rtss/raw_dom_2026*.jsonl`（7/11/13/6/4/2 行）及 `rtss_alerts_*.csv` 已更新。
+2. **timeout 殺 process 實測**：暫改 step 1/3 timeout 為 5 秒重撳——
+   (a) 紅框 `1/3 補抓 RTSS 文字 TIMEOUT（>5s，process 已 kill）` 如實顯示；
+   (b) `Get-Process python` 只剩 baseline 兩個（Streamlit＋無關），`Get-CimInstance` 按 CommandLine 查 `fetch_rtss` **零孤兒**——
+   證實 `_kill_process_tree` 嘅 `taskkill /PID /T /F` 喺 Windows 真係殺成棵樹。**驗完已改返 180/300。**
+
+**三個修復（`scripts/fetch_rtss_cdp.py`）：**
+
+1. `_ensure_jump_control` search 開關 selector 加 `[title="Search this chat"]` 排第一——
+   呢個先係 A client 嘅真開關；原本三個 selector（`[title="Search"]` 等）喺 A client 全部 exact-match 唔中，
+   造成「時得時唔得」（`button .icon-search` 命中與否視乎 DOM 順序）。
+2. Landing check 加 **bracket acceptance**：`target in after_dates` 之外，
+   接受 `min(after_dates) ≤ target ≤ max(after_dates)`——
+   處理午夜後相對 label 漂移（例如 00:xx 跳「上星期二」，"Tuesday" 被 `_date_from_label` 解做最近嗰個禮拜二而永遠 match 唔到）；
+   poll 由 20×250ms 加到 40×250ms 俾 Telegram 惰性載入。`verify_anchor` 仍然係後置硬門。
+3. `_harvest_day` 對 `_jump_to_date` 加 **retry×4 ＋ page.reload() 自癒**：
+   Telegram Web A 長開後會靜默無視 Jump to Date（confirm 收到但 DOM 完全唔郁，實測證實），
+   第 3 次失敗後 reload 頁面再試——URL 帶 RTSS fragment，client 會重開同一頻道。實測 reload 後即 landing。
+
+**操作知識（新代碼前必讀）：**
+
+- **RTSS 一定要用 Web A client**（`web.telegram.org/a/#-2795969450`）；K client 嘅 DOM 無 `title="Jump to Date"`，
+  `_ensure_jump_control` 必死。console 開 Chrome 用 root URL 會預設跌入 K——要用 `/a/` URL。
+- TG Web jump 靜默失敗＝client state 劣化，**reload 個 tab 就復原**（KL 口訣「有問題就 restart」嘅輕量版）；
+  成個 Chrome restart 亦可。
+- Telegram A 嘅 date picker **禁咗今日**（"no enabled day 15"），所以補抓範圍唔可以包今日；抓今日用「抓今日 RTSS」。
+- `data/rtss`（唔係 `rtss_data/`）先係 fetch 輸出目錄。
+
+**遺留**：O1 原圖映射照 §15.2 狀態（Telegram `waiting for network` 會令 jump/ harvest 失敗，需 TG 恢復先再做）；
+全套 pytest 維持 67 passed（本輪只動 `_ensure_jump_control`/`_jump_to_date`/`_harvest_day`，無新增測試）。
+
 
 ## 14. 第五階段 A2：即市上雲（zcode，2026-09-09 深夜）——等 KL 貼 env 即著
 

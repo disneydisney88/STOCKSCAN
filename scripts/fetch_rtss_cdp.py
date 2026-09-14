@@ -235,7 +235,8 @@ def _ensure_jump_control(page) -> None:
     ctl = page.locator('[title="Jump to Date"]')
     if ctl.count() and ctl.first.is_visible():
         return
-    for selector in ('[title="Search"]', '[aria-label="Search"]', 'button .icon-search'):
+    for selector in ('[title="Search this chat"]', '[title="Search"]',
+                     '[aria-label="Search"]', 'button .icon-search'):
         button = page.locator(selector).first
         if button.count() and button.is_visible():
             button.click()
@@ -352,17 +353,21 @@ def _jump_to_date(page, target: date) -> None:
     changed = False
     after_labels = before_labels
     after_dates: set[date] = set()
-    for _ in range(20):
+    for _ in range(40):
         page.wait_for_timeout(250)
         after_labels = _visible_date_labels(page)
         after_dates = {
             parsed for label in after_labels
             if (parsed := _date_from_label(label)) is not None
         }
-        # The absolute target date is the only success criterion.  A changed
-        # DOM can still be the wrong day, so visual movement is not evidence
-        # of a correct landing (verify_anchor remains the later hard gate).
-        if target in after_dates:
+        # Exact absolute match is the primary criterion.  A weekday label one
+        # week back (e.g. jumping to last Tuesday just after midnight) resolves
+        # to this week's Tuesday and can never equal target, so also accept the
+        # bracket case: target inside the visible date range.  verify_anchor
+        # remains the later hard gate for wrong-day landings.
+        exact = target in after_dates
+        bracket = bool(after_dates) and min(after_dates) <= target <= max(after_dates)
+        if exact or bracket:
             changed = True
             break
     if not changed:
@@ -441,7 +446,33 @@ def _harvest_day(page, target: date, max_local_steps: int = 15) -> list[dict]:
             }
         return dates, set(seen)
 
-    _jump_to_date(page, target)
+    # Telegram Web intermittently ignores a Jump to Date click (the DOM stays
+    # at the previous position).  Bounded retry: the flow is idempotent and
+    # verify_anchor still gates each landing downstream.
+    last_jump_err: Exception | None = None
+    for _attempt in range(4):
+        try:
+            _jump_to_date(page, target)
+            last_jump_err = None
+            break
+        except RuntimeError as exc:
+            last_jump_err = exc
+            print(f"[rtss-cdp] jump_retry attempt={_attempt + 1} target={target.isoformat()}")
+            if _attempt == 2:
+                # Telegram Web A silently ignores Jump to Date once its client
+                # state degrades after long sessions; a page reload restores
+                # working jumps (verified live 2026-09-15).  The URL keeps the
+                # RTSS fragment, so the client reopens the same channel.
+                print("[rtss-cdp] jump_reload_page before final attempt")
+                page.reload()
+                for _ in range(20):
+                    page.wait_for_timeout(1000)
+                    if page.locator(".MessageList").count():
+                        break
+            else:
+                page.wait_for_timeout(2000)
+    if last_jump_err is not None:
+        raise last_jump_err
     dates, _ = harvest()
     for i in range(max_local_steps):
         if any(d < target for d in dates):
@@ -449,7 +480,33 @@ def _harvest_day(page, target: date, max_local_steps: int = 15) -> list[dict]:
         _scroll_up(scroll, page)
         dates, _ = harvest()
 
-    _jump_to_date(page, target)
+    # Telegram Web intermittently ignores a Jump to Date click (the DOM stays
+    # at the previous position).  Bounded retry: the flow is idempotent and
+    # verify_anchor still gates each landing downstream.
+    last_jump_err: Exception | None = None
+    for _attempt in range(4):
+        try:
+            _jump_to_date(page, target)
+            last_jump_err = None
+            break
+        except RuntimeError as exc:
+            last_jump_err = exc
+            print(f"[rtss-cdp] jump_retry attempt={_attempt + 1} target={target.isoformat()}")
+            if _attempt == 2:
+                # Telegram Web A silently ignores Jump to Date once its client
+                # state degrades after long sessions; a page reload restores
+                # working jumps (verified live 2026-09-15).  The URL keeps the
+                # RTSS fragment, so the client reopens the same channel.
+                print("[rtss-cdp] jump_reload_page before final attempt")
+                page.reload()
+                for _ in range(20):
+                    page.wait_for_timeout(1000)
+                    if page.locator(".MessageList").count():
+                        break
+            else:
+                page.wait_for_timeout(2000)
+    if last_jump_err is not None:
+        raise last_jump_err
     dates, _ = harvest()
     for i in range(max_local_steps):
         if any(d > target for d in dates):
