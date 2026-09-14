@@ -32,6 +32,7 @@ spec.loader.exec_module(fetcher)
 
 FIELDS = ["message_id", "msg_ts_hkt", "board_text", "board_type", "threshold_x",
           "cache_url", "cache_key", "map_method", "map_confidence"]
+CANONICAL_PEER_ID = "-1002795969450"
 
 
 def install_cache_probe(page) -> None:
@@ -46,6 +47,32 @@ def install_cache_probe(page) -> None:
         return oldMatch.call(this, request, ...args);
       };
     }""")
+
+
+def functional_gate(page) -> None:
+    """Require a live message page before any mapping harvest starts."""
+    cache = page.evaluate("""async()=>{const c=await caches.open('tt-media');
+      const keys=await c.keys(); return {entries:keys.length,
+      photos:keys.filter(x=>/photo|document/i.test(x.url)).length};}กระ""".replace("}กระ", "}"))
+    print(f"[rtss-map] canonical_peer={CANONICAL_PEER_ID} url={page.url} "
+          f"tt-media_entries={cache['entries']} photo_entries={cache['photos']}")
+    body = page.locator("body").inner_text().lower()
+    if "waiting for network" in body:
+        raise RuntimeError("BLOCKED: Telegram page reports waiting for network")
+    if not page.locator(".message, .Message").count():
+        raise RuntimeError("BLOCKED: functional gate found no Telegram messages")
+    # Use the existing, previously validated daily jump; this gate does not
+    # alter its selectors or implementation.
+    known = date(2026, 9, 11)
+    try:
+        fetcher._jump_to_date(page, known)
+    except Exception as exc:
+        raise RuntimeError(f"BLOCKED: functional gate jump failed for {known}: {exc}") from exc
+    if not fetcher.verify_anchor(page, known):
+        raise RuntimeError(f"BLOCKED: functional gate anchor failed for {known}")
+    if not page.locator(".message, .Message").count():
+        raise RuntimeError("BLOCKED: functional gate anchor has no messages")
+    print(f"[rtss-map] functional_gate=PASS known_date={known.isoformat()}")
 
 
 def dom_candidates(page, target: date) -> list[dict]:
@@ -187,6 +214,7 @@ def main() -> int:
             raise RuntimeError("BLOCKED: RTSS Telegram tab not found on CDP 9222")
         page = pages[0]
         fetcher._assert_client(page)
+        functional_gate(page)
         all_rows = []
         for target in dates:
             all_rows.extend(map_day(page, target))

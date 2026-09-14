@@ -305,6 +305,8 @@ pytest -q                                      # 49 tests 全綠
 - 四條配對方法均在程式內獨立記錄：DOM direct、Telegram state、Cache Storage response bytes SHA-256、最後才是 cache request order（`LOW`）。只有 bytes 精確相同先標 `HIGH`，不以順序猜測冒充高信心。
 - O1 驗收日 2026-04-17、2026-05-13、2026-08-05 未能完成：Chrome CDP 可連，client／scroll container assert 通過，但 Telegram 顯示 `waiting for network`；日曆選取後可見 DOM 仍為 `Wednesday/Thursday/Friday/Saturday/Yesterday`，既未驗證目標 anchor，亦未產生 mapping CSV。按規格標 **BLOCKED**，未開 O2。
 - 本輪本地驗證：`python -m pytest -q --basetemp=.pytest-tmp-o1-final` → **64 passed**；無 `data/rtss/media/` 檔案加入 commit。
+- O1 重試前置探測（Chrome 重開後）：`/json/version` 有 `webSocketDebuggerUrl`；RTSS tab 前台且無 `waiting for network`；目前 tab 為 Web K，URL hash 顯示 `-2795969450`（canonical peer `-1002795969450`）。功能閘量到 `tt-media entries=4927`、photo/document entries=4706。
+- 功能閘嘗試跳到已知有訊息日 2026-09-11 時，沿用既有 `_jump_to_date` 報 `Jump to Date control not found`（K DOM 不提供 A selector）。結果標 **BLOCKED**；未進入三日 harvest、未改日曆、未開 O2。
 
 
 ## 14. 第五階段 A2：即市上雲（zcode，2026-09-09 深夜）——等 KL 貼 env 即著
