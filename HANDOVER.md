@@ -506,3 +506,37 @@ G4 已在 Streamlit 加入第 11 個 GO 預示器 tab（事前篩選及 flag-onl
 - GO predictor 由 `radar_eod_panel_full.csv` 帶入同日 `has_broker_shot`；不呼叫 CCASS。
 - 新 baseline（4,036 行）：`has_broker_shot=1` 對 `led_to_go_180d` lift **0.863422**（1,115 行）；對 `led_to_perform` lift **1.002612**（911 個已知 t60 outcome）。
 - GitHub Actions 09-10 至 09-16 均有 run，但全部在 `Commit radar CSV` exit 128 失敗，main 因此停在 09-09；workflow 改用 concurrency + direct `git push origin HEAD:main`，避免失敗的 rebase 路徑。
+
+## 20. CCASS warm 本機直連＋PART 2 接線（zcode，2026-09-17/18 通宵）
+
+規格：`claude_HANDOVER_CCASS_warm本機直連交接_20260917.md`。CCASS tool repo（`C:\Users\klcho\webbsite-ccass-tool`，
+已由 50a1290 pull 到 e25f4d9+）今晚 commit：warm v2（`2427948`）、錯誤統計＋babysitter（`38a6a22`）、
+chunked driver（`b346204`）、0xmd 判死記錄（`569695d`）、HANDOVER（`2f504c2`）。
+
+### 已交付
+- **憑證統一**：`_secrets\.env`（8 個變數，Drive 同步、gitignored；commit `682cc48`）。
+  讀取次序：st.secrets → repo .env → **repo _secrets/.env** → ~/.stockscan/.env → 環境變數
+  （`load_secrets_env()`，pytest 內自動 skip 防誤觸生產 Turso——`test_state_roundtrip` 中過伏已修，75 passed）。
+- **warm v2 本機直連**：`warm_ccass_cache.py` 改直連 webb-database.com（唔經 Render），issue_id
+  inline／batch 解析、Yahoo 側拉熄掉（原本每隻 ~30s hang 嘅根因）、並發、checkpoint 續跑、
+  Turso `api_stock_cache` 同 schema。100 隻試跑：6.1 秒/隻（wall）、Turso verify 命中。
+- **PART 2 管道**（等 warm 完先出數）：`stockscan/ccass_turso.py`（直連 Turso 讀 api_stock_cache，
+  繞開 Render）→ `scripts/build_concentration_features.py`（**T-2 交易日 cutoff 防未來函數**；
+  覆蓋唔到一律 unknown 唔當 0；`hd_top10_pct_of_ccass` 參考欄由 holdings_daily 自計 of-CCASS 口徑）
+  → `build_go_predictors.py` 加 `ccass_top10_pct`／`concentration_rising` 兩個 feature bins。
+
+### 通宵實測發現（全部記錄，唔靠估）
+- webb-database.com 會硬 403（IIS "Access is denied"，**冇挑戰頁可解**）——burst 後 IP ban
+  20-40 分鐘自動解封；`warm_chunked_v2.py`（100 隻一批＋8 分鐘冷卻＋probe 自癒，idempotent）
+  係對應節奏，MAX_CYCLES=40。
+- 0xmd：cookie 移植技術上成功（jar＋精確 UA＋同 IP），但 CCASS 頁係 **200 空殼冇 table**——冇數據，判死。
+- Render API 再測：60.9s RemoteDisconnected＋503——上游照舊唔穩，本地直連係唯一可行路。
+- Turso `holdings_daily` 只有 150 隻 code、2026-07-16 起且疏；api_stock_cache 集中度窗口 ~15 個
+  CCASS 日——**所以 predictor 嘅 CCASS 覆蓋天然限於近期 scan_date**，舊行係 unknown（誠實限制，
+  將來要深歷史要靠 webb cconchist 日期參數或 CCASS API 修復，唔係今晚管道問題）。
+
+### 晨早 runbook（未完部分）
+1. `python scripts/warm_chunked_v2.py`（idempotent，會 retry 非 OK；現 341/1,226 OK，871 待 retry）
+2. pending=0 後：`python scripts/build_concentration_features.py` → `python scripts/build_go_predictors.py`
+3. 報表 copy 兩邊交收夾 tracking\；GO 預示器 tab11 自動讀到新 predictor CSV
+*本節只列數字同方法，結論留 KL/Claude。*
