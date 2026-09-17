@@ -486,3 +486,8 @@ tracking_summary／l_shape_version_diff／recurrence_20260914.csv＋5 個季度 
 ### GO 預示器（G1–G5）
 
 產物會寫入 `data/reports/` 並同步至交收夾 `STOCKSCAN_交收\tracking\`。所有特徵均以 listing date 或以前資料計算；未滿 20 筆的分組標記 `insufficient_sample`，不作推論。供股回報如受 Longbridge 未調整影響會加 `_est`，不納入 clean 統計。GO 結果只作事前研究及旗標展示，不構成投資建議。
+
+本次 G1–G3 以追蹤簿 4,036 行產出：GO 標籤 109、供股標籤 99；輸出
+`go_features.csv`、`go_predictors.csv`、`rights_features.csv`、`rights_predictors.csv`。
+G4 已在 Streamlit 加入第 11 個 GO 預示器 tab（事前篩選及 flag-only 顯示）。
+完整測試：**71 passed**。報表副本已放入 `G:\我的雲端硬碟\STOCKSCAN_交收\tracking\`。
