@@ -19,9 +19,12 @@ FEATURES = [
     "prior_change_of_control", "prior_placing_180d", "prior_rights_180d",
     "prior_consolidation_180d", "has_broker_shot", "appearance_seq",
     "recurrence", "board",
+    # P6b PART 2：CCASS 集中度（直連 Turso，T-2 交易日 cutoff 防未來函數）
+    "ccass_top10_pct", "concentration_rising",
 ]
 
 PANEL = ROOT / "data" / "eod" / "radar_eod_panel_full.csv"
+CONCENTRATION = REPORTS / "ccass_concentration_features.csv"
 
 
 def _asof_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -48,6 +51,17 @@ def _asof_features(df: pd.DataFrame) -> pd.DataFrame:
             d = d.drop(columns="_panel_has_broker_shot")
         else:
             d = d.rename(columns={"_panel_has_broker_shot": "has_broker_shot"})
+    # P6b PART 2：CCASS 集中度特徵（build_concentration_features.py 產出）。
+    # 檔案唔存在就全 unknown，照出 bin——唔好靜靜跌走個 feature。
+    if CONCENTRATION.exists():
+        cf = pd.read_csv(CONCENTRATION, dtype={"code5": str}, encoding="utf-8-sig")
+        cf["scan_date"] = pd.to_datetime(cf["scan_date"], errors="coerce").dt.date
+        cf = cf.drop_duplicates(["code5", "scan_date"])
+        d = d.merge(cf.drop(columns=["ccass_top10_pct_known"]), on=["code5", "scan_date"],
+                    how="left")
+    for c in ("ccass_top10_pct", "concentration_rising", "ccass_top10_delta"):
+        if c not in d:
+            d[c] = np.nan
     # Absent upstream feeds remain explicitly null rather than being guessed.
     for c in ("mcap", "turnover_to_mcap", "ratio", "board"):
         if c not in d:
@@ -107,6 +121,15 @@ def _groups(s: pd.Series, feature: str) -> pd.Series:
     if feature == "appearance_seq":
         x = pd.to_numeric(s, errors="coerce").fillna(0)
         return pd.cut(x, [-1, 1, 2, 4, np.inf], labels=["1", "2", "3-4", ">=5"]).astype(str)
+    if feature == "ccass_top10_pct":
+        x = pd.to_numeric(s, errors="coerce")
+        return pd.cut(x, [-np.inf, 30, 50, 70, np.inf],
+                      labels=["<30%", "30-50%", "50-70%", ">=70%"]).astype(object).where(
+                          x.notna(), "unknown")
+    if feature == "concentration_rising":
+        x = pd.to_numeric(s, errors="coerce")
+        label = x.map({1.0: "rising(>+1pp)", 0.5: "flat(±1pp)", 0.0: "falling(<-1pp)"})
+        return label.where(x.notna(), "unknown")
     return s.fillna("unknown").astype(str)
 
 
