@@ -13,14 +13,15 @@ from urllib.request import Request, urlopen
 from dotenv import load_dotenv
 
 from config import DATA_DIR
-from stockscan.io_utils import HKT, log_error
+from stockscan.io_utils import HKT, load_secrets_env, log_error
 
 
 def _load_config() -> tuple[str, str]:
+    load_secrets_env()  # repo _secrets/.env → ~/.stockscan/.env（已設環境變數一定贏）
     load_dotenv(Path.home() / ".stockscan" / ".env")
     url, key = os.environ.get("CCASS_API_URL"), os.environ.get("CCASS_API_KEY")
     if not url or not key:
-        raise RuntimeError("CCASS_API_URL／CCASS_API_KEY 未設定")
+        raise RuntimeError("CCASS_API_URL／CCASS_API_KEY 未設定（正印：repo _secrets/.env）")
     return url.rstrip("/"), key
 
 

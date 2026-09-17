@@ -33,3 +33,6 @@ data/rtss/
 
 # P6 交收副本：tracking/ 係 copy 去 Drive 交收夾嘅副本，正印喺 data/reports/
 tracking/
+
+# 統一憑證（Longbridge+Turso+CCASS）——Drive 同步但唔准 push
+_secrets/

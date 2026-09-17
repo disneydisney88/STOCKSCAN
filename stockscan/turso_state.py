@@ -10,6 +10,9 @@ TURSO_AUTH_TOKEN = "TURSO_AUTH_TOKEN"
 
 
 def configured() -> bool:
+    from stockscan.io_utils import load_secrets_env
+
+    load_secrets_env()  # P6b：repo _secrets/.env（已設環境變數一定贏）
     return bool(os.getenv(TURSO_DATABASE_URL, "").strip() and os.getenv(TURSO_AUTH_TOKEN, "").strip())
 
 

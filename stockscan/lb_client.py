@@ -52,10 +52,14 @@ def ensure_credentials() -> None:
     except Exception:
         pass
 
-    # 2) repo .env（可選）→ 3) 用者目錄 .stockscan\.env（正印）
+    # 2) repo .env（可選）→ 2b) repo _secrets/.env（P6b 統一憑證，Drive 同步、gitignored）
+    #    → 3) 用者目錄 .stockscan\.env（正印）
     from dotenv import load_dotenv
 
+    from stockscan.io_utils import load_secrets_env
+
     load_dotenv()  # repo 根目錄（python-dotenv 唔會覆蓋已存在環境變數）
+    load_secrets_env()
     if not all(os.environ.get(k) for k in REQUIRED_KEYS):
         home_env = Path.home() / ".stockscan" / ".env"
         if home_env.exists():

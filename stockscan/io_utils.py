@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -9,9 +10,37 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
-from config import DATA_DIR, EOD_DIR, INTRADAY_DIR, LOGS_DIR, STATE_DIR, TZ
+from config import DATA_DIR, EOD_DIR, INTRADAY_DIR, LOGS_DIR, ROOT, STATE_DIR, TZ
 
 HKT = ZoneInfo(TZ)
+
+
+def load_secrets_env() -> list[str]:
+    """P6b 統一憑證：載入 repo `_secrets/.env`（Drive 同步、gitignored，唔准 push）
+    同 `%USERPROFILE%\\.stockscan\\.env`。用 setdefault——已設環境變數一定贏。
+    回傳載入咗嘅檔案標記（只記檔名同 key 數，唔記值）。"""
+    loaded: list[str] = []
+    for path in (ROOT / "_secrets" / ".env", Path.home() / ".stockscan" / ".env"):
+        try:
+            if not path.is_file():
+                continue
+            fresh = 0
+            for line in path.read_text(encoding="utf-8-sig").splitlines():
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, value = line.split("=", 1)
+                key = key.strip()
+                if key.lower().startswith("$env:"):
+                    key = key[len("$env:"):].strip()
+                value = value.strip().strip('"').strip("'")
+                if key and value and not os.environ.get(key):
+                    os.environ[key] = value
+                    fresh += 1
+            loaded.append(f"{path.name}({fresh})")
+        except OSError:
+            continue
+    return loaded
 
 
 def now_hkt() -> datetime:
