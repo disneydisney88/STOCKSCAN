@@ -75,9 +75,9 @@ def data_asof(df: pd.DataFrame) -> str:
     return str(df["scan_time"].dropna().max())[:16]
 
 
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = st.tabs(
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11 = st.tabs(
     ["📊 收市爆量榜（訊號A）", "⚡ 即市掃描（訊號B）", "🔬 對照 RTSS", "🗂 歷史面板", "📈 事件率",
-     "🔎 個股研究", "9️⃣ RTSS 對照", "🐤 春江鴨", "🧩 L 型候選", "📕 追蹤簿"])
+     "🔎 個股研究", "9️⃣ RTSS 對照", "🐤 春江鴨", "🧩 L 型候選", "📕 追蹤簿", "1️⃣1️⃣ GO 預示器"])
 
 with tab1:
     files = [f for f in eod_files() if f.name not in {"radar_eod_panel.csv", "radar_eod_panel_full.csv"}]
@@ -458,6 +458,31 @@ with tab10:
             c3.metric("t20 中位・全部", _fmt(med.get("all")),
                       f"n={n.get('all', 0)}（非_est）")
             st.caption("中位數只計 ret_t20 非 _est 行；_est 行數見 tracking_summary.csv n_est 欄。")
+
+with tab11:
+    st.caption("GO/供股預示器只展示事前特徵與歷史關聯；不構成投資建議。小樣本會標記 insufficient_sample。")
+    gp = read_csv_if_exists(DATA_DIR / "reports" / "go_predictors.csv")
+    rp = read_csv_if_exists(DATA_DIR / "reports" / "rights_predictors.csv")
+    gf = read_csv_if_exists(DATA_DIR / "reports" / "go_features.csv")
+    if gp.empty or gf.empty:
+        st.info("未有 GO 報表。先跑：`python scripts/build_go_predictors.py`")
+    else:
+        left, right = st.columns(2)
+        with left:
+            st.subheader("GO predictors")
+            st.dataframe(gp, use_container_width=True, hide_index=True)
+        with right:
+            st.subheader("Rights predictors")
+            st.dataframe(rp, use_container_width=True, hide_index=True)
+        st.subheader("事前篩選（flag-only）")
+        feature = st.selectbox("特徵", [c for c in FEATURES if c in gf.columns] if "FEATURES" in globals() else ["appearance_seq", "recurrence", "prior_go_365d"])
+        if feature in gf.columns:
+            vals = sorted(gf[feature].dropna().astype(str).unique())
+            chosen = st.multiselect("值", vals, default=vals[:1])
+            current = gf[gf["scan_date"] == gf["scan_date"].max()] if "scan_date" in gf else gf
+            if chosen:
+                current = current[current[feature].astype(str).isin(chosen)]
+            st.dataframe(current, use_container_width=True, hide_index=True)
 
         st.subheader(f"明細（{len(show)} 行）")
         st.dataframe(show, use_container_width=True, height=520, hide_index=True)
