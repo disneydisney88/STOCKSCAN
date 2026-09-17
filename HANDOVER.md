@@ -499,3 +499,10 @@ G4 已在 Streamlit 加入第 11 個 GO 預示器 tab（事前篩選及 flag-onl
 - 今次不接 CCASS，`has_broker_shot` join 留待 CCASS pipe 修復後另行處理。
 - 4,036 行；`led_to_perform` 已知 3,270 行。`go_predictors.csv` 含兩個 outcome，另有 `go_predictors_led_to_go.csv` 及 `go_predictors_led_to_perform.csv`。
 - 完整測試：**73 passed**。副本已送 `G:\我的雲端硬碟\STOCKSCAN_交收\tracking\`。
+
+### 券商射倉 join／Actions 日期更新（2026-09-17）
+
+- `broker_shots.csv` 以五位 `code5`、日期欄對齊 EOD panel；四個現成檔共 86,853 行，重新 import 後 panel `has_broker_shot=1` 共 1,115 行。
+- GO predictor 由 `radar_eod_panel_full.csv` 帶入同日 `has_broker_shot`；不呼叫 CCASS。
+- 新 baseline（4,036 行）：`has_broker_shot=1` 對 `led_to_go_180d` lift **0.863422**（1,115 行）；對 `led_to_perform` lift **1.002612**（911 個已知 t60 outcome）。
+- GitHub Actions 09-10 至 09-16 均有 run，但全部在 `Commit radar CSV` exit 128 失敗，main 因此停在 09-09；workflow 改用 concurrency + direct `git push origin HEAD:main`，避免失敗的 rebase 路徑。

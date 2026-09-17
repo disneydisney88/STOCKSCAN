@@ -33,13 +33,21 @@ def _asof_features(df: pd.DataFrame) -> pd.DataFrame:
     # the as-of EOD panel on the same code/date; this is not the CCASS pipe.
     if PANEL.exists():
         panel = pd.read_csv(PANEL, usecols=["scan_date", "code5", "mcap_total",
-                                             "ratio", "turnover_to_mcap"])
+                                             "ratio", "turnover_to_mcap",
+                                             "has_broker_shot"])
         panel["scan_date"] = pd.to_datetime(panel["scan_date"], errors="coerce").dt.date
         panel["code5"] = panel["code5"].astype(str).str.zfill(5)
         panel = panel.drop_duplicates(["code5", "scan_date"])
+        panel = panel.rename(columns={"has_broker_shot": "_panel_has_broker_shot"})
         d = d.drop(columns=[c for c in ("mcap", "ratio", "turnover_to_mcap") if c in d])
         d = d.merge(panel, on=["code5", "scan_date"], how="left")
         d = d.rename(columns={"mcap_total": "mcap"})
+        if "has_broker_shot" in d:
+            d["has_broker_shot"] = d["has_broker_shot"].fillna(
+                d["_panel_has_broker_shot"])
+            d = d.drop(columns="_panel_has_broker_shot")
+        else:
+            d = d.rename(columns={"_panel_has_broker_shot": "has_broker_shot"})
     # Absent upstream feeds remain explicitly null rather than being guessed.
     for c in ("mcap", "turnover_to_mcap", "ratio", "board"):
         if c not in d:

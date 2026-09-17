@@ -37,3 +37,12 @@ def test_numeric_predictor_bins_are_domain_bins():
     assert set(_groups(d["mcap"], "mcap")) == {"<1億", "1-3億", "3-10億", ">=10億"}
     assert set(_groups(d["ratio"], "ratio")) == {"<20x", "20-50x", ">50x"}
     assert set(_groups(d["turnover_to_mcap"], "turnover_to_mcap")) == {"<1%", "1-5%", ">5%"}
+
+
+def test_panel_broker_flag_is_preserved_without_ccass_fetch():
+    d = pd.DataFrame({
+        "code5": ["00001"], "scan_date": ["2026-01-02"],
+        "appearance_seq": [1], "has_broker_shot": [1],
+    })
+    out = _asof_features(d)
+    assert out["has_broker_shot"].iloc[0] == 1
