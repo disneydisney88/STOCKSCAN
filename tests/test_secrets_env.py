@@ -20,6 +20,8 @@ def test_load_secrets_env_merges_without_overriding(tmp_path, monkeypatch):
     monkeypatch.setenv("EXISTING_TEST_KEY", "already_set")
     # io_utils 係 from config import ROOT——module 內已綁定，要 patch io_utils 嗰個名
     monkeypatch.setattr("stockscan.io_utils.ROOT", tmp_path)
+    # load_secrets_env 喺 pytest 入面會 skip（防誤觸生產憑證）——呢個 test 就係測佢，要解鎖
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
 
     loaded = load_secrets_env()
 

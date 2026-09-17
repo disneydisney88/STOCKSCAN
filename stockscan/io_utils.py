@@ -18,7 +18,13 @@ HKT = ZoneInfo(TZ)
 def load_secrets_env() -> list[str]:
     """P6b 統一憑證：載入 repo `_secrets/.env`（Drive 同步、gitignored，唔准 push）
     同 `%USERPROFILE%\\.stockscan\\.env`。用 setdefault——已設環境變數一定贏。
-    回傳載入咗嘅檔案標記（只記檔名同 key 數，唔記值）。"""
+    回傳載入咗嘅檔案標記（只記檔名同 key 數，唔記值）。
+
+    pytest 入面一律 skip（`PYTEST_CURRENT_TEST`）：本機有真憑證檔之後，
+    測試會誤觸生產 Turso（test_state_roundtrip 中過伏）。要測 loader 嘅
+    測試自行 delenv 呢個變數。"""
+    if "PYTEST_CURRENT_TEST" in os.environ:
+        return []
     loaded: list[str] = []
     for path in (ROOT / "_secrets" / ".env", Path.home() / ".stockscan" / ".env"):
         try:
