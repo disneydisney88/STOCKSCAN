@@ -491,3 +491,11 @@ tracking_summary／l_shape_version_diff／recurrence_20260914.csv＋5 個季度 
 `go_features.csv`、`go_predictors.csv`、`rights_features.csv`、`rights_predictors.csv`。
 G4 已在 Streamlit 加入第 11 個 GO 預示器 tab（事前篩選及 flag-only 顯示）。
 完整測試：**71 passed**。報表副本已放入 `G:\我的雲端硬碟\STOCKSCAN_交收\tracking\`。
+
+### GO predictor clean baseline 修正（2026-09-17）
+
+- `led_to_go_180d` 保留；新增 `led_to_perform`，定義為已知 `ret_t60 > 0`。缺少 t60 收市資料保持 unknown，不當作 0。
+- mcap/ratio/turnover_to_mcap 從同日 EOD panel 補回，並按 `<1億 / 1-3億 / 3-10億 / >=10億`、`<20x / 20-50x / >50x`、`<1% / 1-5% / >5%` 分組。
+- 今次不接 CCASS，`has_broker_shot` join 留待 CCASS pipe 修復後另行處理。
+- 4,036 行；`led_to_perform` 已知 3,270 行。`go_predictors.csv` 含兩個 outcome，另有 `go_predictors_led_to_go.csv` 及 `go_predictors_led_to_perform.csv`。
+- 完整測試：**73 passed**。副本已送 `G:\我的雲端硬碟\STOCKSCAN_交收\tracking\`。
