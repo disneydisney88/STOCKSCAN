@@ -40,18 +40,29 @@ def _normalise(frame: pd.DataFrame) -> pd.DataFrame:
     return out[out["code5"].notna()]
 
 
-def _reasons(rtss: pd.DataFrame) -> str:
+def _reasons(rtss: pd.DataFrame, stockscan_count: int = 0, daemon_off: bool = False) -> str:
     reasons: list[str] = []
+    # A missing symbol is not evidence that the daemon was off; only an
+    # entirely empty StockScan feed indicates that condition.
+    if daemon_off:
+        reasons.append("daemon_off")
+    msg_types = set(rtss.get("msg_type", pd.Series(dtype=str)).dropna().astype(str))
+    if "PLUNGE" in msg_types:
+        reasons.append("plunge_not_tracked")
     if not rtss.empty and "mcap" in rtss:
         mcap = pd.to_numeric(rtss["mcap"], errors="coerce")
         if mcap.ge(3e8).any():
-            reasons.append("mcap_over_3e8")
+            reasons.append("mcap_over_cap")
     if not rtss.empty and "turnover" in rtss:
         turnover = pd.to_numeric(rtss["turnover"], errors="coerce")
         if turnover.lt(5e5).any():
-            reasons.append("turnover_below_500k")
+            reasons.append("below_threshold")
+    if not reasons and not rtss.empty and "chg_pct" in rtss:
+        chg = pd.to_numeric(rtss["chg_pct"], errors="coerce").abs()
+        if chg.lt(20).all():
+            reasons.append("below_threshold")
     if not reasons:
-        reasons.append("daemon_or_definition_difference")
+        reasons.append("unknown")
     return ";".join(reasons)
 
 
@@ -88,7 +99,7 @@ def compare_day(day: date, rtss_path: Path | None = None, stockscan_path: Path |
                                       if not r.empty and "count_today" in r else ""),
             "rtss_max_chg_pct": (pd.to_numeric(r["chg_pct"], errors="coerce").max()
                                   if not r.empty and "chg_pct" in r else ""),
-            "possible_reason": _reasons(r) if group == "rtss_only" else "",
+            "possible_reason": _reasons(r, len(o), ours.empty) if group == "rtss_only" else "",
         })
     result = pd.DataFrame(rows, columns=OUT_COLUMNS)
     out_path = out_path or REPORT_DIR / f"rtss_daily_diff_{day:%Y%m%d}.csv"

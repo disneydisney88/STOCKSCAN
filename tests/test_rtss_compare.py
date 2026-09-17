@@ -18,4 +18,4 @@ def test_compare_day_returns_three_groups_and_reason(tmp_path):
     compare_day(pd.Timestamp("2026-09-08").date(), rtss, ours, out)
     got = pd.read_csv(out, encoding="utf-8-sig", dtype={"code5": str})
     assert set(got["group"]) == {"both", "rtss_only", "stockscan_only"}
-    assert got.loc[got["code5"] == "09999", "possible_reason"].iloc[0] == "mcap_over_3e8"
+    assert got.loc[got["code5"] == "09999", "possible_reason"].iloc[0] == "mcap_over_cap"

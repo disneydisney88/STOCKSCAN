@@ -46,8 +46,9 @@ def _extract_name(raw: str) -> str:
     if not code_match:
         return ""
     prefix = raw[:code_match.start()].strip()
-    if "急升異動" in prefix or "大市值" in prefix or "爆量" in prefix:
-        prefix = re.sub(r"^.*?\]\s*", "", prefix).strip()
+    # Alert headings are metadata, never part of the security name.
+    prefix = re.sub(r"^.*?(?:急升異動|急跌監察警報|大市值|爆量|財報)\s*[!！:：\-—]?\s*", "", prefix).strip()
+    prefix = re.sub(r"^.*?\]\s*", "", prefix).strip()
     return prefix
 
 
@@ -58,7 +59,7 @@ def parse_alert(text: str, message_date: date | str | None = None,
     code_match = _CODE_RE.search(raw)
     name_match = _NAME_RE.search(raw)
     count_match = _COUNT_RE.search(raw)
-    pct_match = re.search(r"升幅\s*[:：]\s*([+-]?\d+(?:\.\d+)?)\s*%", raw)
+    pct_match = re.search(r"(?:升幅|跌幅|變幅)\s*[:：]\s*([+-]?\d+(?:\.\d+)?)\s*%", raw)
     price_match = re.search(r"最新價\s*[:：]\s*([+-]?\d+(?:\.\d+)?)", raw)
     time_match = _TIME_RE.search(raw)
     if not time_match:
@@ -84,6 +85,7 @@ def parse_alert(text: str, message_date: date | str | None = None,
         "code5": code_match.group(1).zfill(5) if code_match else "",
         "name": _extract_name(raw) if code_match else "",
         "msg_type": ("EARNINGS" if "財報" in raw else
+                     "PLUNGE" if "急跌監察" in raw else
                      "SURGE" if "急升異動" in raw else
                      "VOLUME" if "爆量" in raw else
                      "大市值" if "大市值" in raw else "UNKNOWN"),

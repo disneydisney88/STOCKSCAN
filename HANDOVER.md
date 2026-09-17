@@ -474,3 +474,15 @@ tracking_summary／l_shape_version_diff／recurrence_20260914.csv＋5 個季度 
 - 最終 pytest：**67 passed**（09-14，同基線一樣全綠）
 
 *本節及所有產出只供學術研究及風險分析，不構成投資建議。*
+
+## 19. RTSS 修正及第七階段 GO 預示器
+
+### RTSS parser（2026-09-17）
+
+- 新增 `PLUNGE`（急跌監察）類型；股票 `name` 只取代號前股票名，不再把警報標題帶入。
+- 差異報告 `possible_reason` 現分為 `daemon_off`、`plunge_not_tracked`、`below_threshold`、`mcap_over_cap`、`unknown`。
+- 已加入 01825 STERLING GP 急跌監察合成測試；parser/compare 相關測試通過。
+
+### GO 預示器（G1–G5）
+
+產物會寫入 `data/reports/` 並同步至交收夾 `STOCKSCAN_交收\tracking\`。所有特徵均以 listing date 或以前資料計算；未滿 20 筆的分組標記 `insufficient_sample`，不作推論。供股回報如受 Longbridge 未調整影響會加 `_est`，不納入 clean 統計。GO 結果只作事前研究及旗標展示，不構成投資建議。

@@ -83,3 +83,15 @@ def test_01536_two_alerts_keep_distinct_alert_ts():
     assert second["count_today"] == 2
     assert second["level_from"] == 22
     assert second["level_to"] == 32
+
+
+def test_sterling_gp_plunge_name_is_not_heading():
+    got = parse_alert(
+        "急跌監察警報! STERLING GP (HK.01825) 市值: 2.1億 成交額: 120萬 "
+        "跌幅: -25.00% 最新價: 0.100 🕐 10:12:13",
+        message_date="2026-09-17",
+    )
+    assert got["msg_type"] == "PLUNGE"
+    assert got["name"] == "STERLING GP"
+    assert "急跌監察警報" not in got["name"]
+    assert got["chg_pct"] == -25.0
