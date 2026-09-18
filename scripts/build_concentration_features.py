@@ -29,8 +29,68 @@ from stockscan.io_utils import today_hkt, write_csv  # noqa: E402
 
 PANEL = ROOT / "data" / "eod" / "radar_eod_panel_full.csv"
 REPORTS = ROOT / "data" / "reports"
+DUMP_DB = Path(r"C:\Users\klcho\Downloads\ccass251227\webb_extract_panel\webb_subset.db")
+DUMP_CSV = Path(r"C:\Users\klcho\Downloads\ccass251227\webb_extract_panel\dailylog.csv")
+X0_SHARES = ROOT / "data" / "raw" / "shares_outstanding_panel_X0.csv"
 LAG_TRADING_DAYS = 2
 RISING_PP = 1.0
+
+
+def _load_dump_dailylog() -> dict[str, pd.DataFrame]:
+    """Webb 17GB dump 抽出嘅 dailylog.csv（已過濾面板 universe）：{code5: df[date, c10]}。
+
+    2025-04-01 → 2025-12-24 逐日；c10 = Top10 CCASS 參與者持股合計（股數）。
+    % 口徑用 of-issued（÷ X0 月度已發行股數），唔估 CCASS 總額語義。
+    注意：要讀匯出嘅 dailylog.csv（過濾版），唔好讀 db 個 dailylog 表——
+    個表入面係全交所 9.6M 行，非 universe issue 嘅 code 欄對照唔可靠。"""
+    if not DUMP_CSV.exists():
+        print(f"[ccass_feat] dump csv 唔存在，跳過 dump 源：{DUMP_CSV}")
+        return {}
+    dl = pd.read_csv(DUMP_CSV, dtype={"code": str}, encoding="utf-8-sig")
+    dl["code5"] = dl["code"].astype(str).str.zfill(5)
+    dl["date"] = dl["atDate"].astype(str)
+    dl["c10"] = pd.to_numeric(dl["c10"], errors="coerce")
+    out = {}
+    for code, g in dl[dl["c10"].notna()].groupby("code5"):
+        out[code] = g.sort_values("date")[["date", "c10"]].reset_index(drop=True)
+    return out
+
+
+def _load_x0_shares() -> pd.DataFrame:
+    """已發行股數 anchor：data/universe.csv total_shares（單一快照，2026-09 口徑）。
+
+    2025H2 窗口用同一 anchor；窗口內有合股/拆股嘅行會標 dump_corp_action_in_window=1
+    （下游 bin 視為唔潔排除，照追蹤簿 _est 紀律）。X0 檔只有 30 隻 pilot，唔夠用。"""
+    uni = pd.read_csv(ROOT / "data" / "universe.csv", dtype={"code5": str}, encoding="utf-8-sig")
+    uni = uni[uni["code5"].notna()].copy()
+    uni["code5"] = uni["code5"].str.zfill(5)
+    uni["shares"] = pd.to_numeric(uni["total_shares"], errors="coerce")
+    return uni[["code5", "shares"]].drop_duplicates("code5").set_index("code5")["shares"]
+
+
+def _issued_for(x0: pd.Series, code: str, scan_date: str):
+    """anchor 股數（單一快照——窗口內有財技嘅行由 corp-action flag 處理）。"""
+    v = x0.get(code)
+    return float(v) if v is not None and pd.notna(v) and v > 0 else None
+
+
+def _load_gap_events() -> dict[str, list[str]]:
+    """events.db CONSOLIDATION/SPLIT 嘅生效日（key_date_1→2→announce fallback），按 code5。"""
+    import sqlite3
+    db = ROOT / "data" / "events.db"
+    if not db.exists():
+        return {}
+    con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+    rows = con.execute(
+        "SELECT code5, COALESCE(NULLIF(key_date_1,''), NULLIF(key_date_2,''), announce_date) "
+        "FROM events WHERE event_type IN ('CONSOLIDATION','SPLIT') "
+        "AND COALESCE(NULLIF(key_date_1,''), NULLIF(key_date_2,''), announce_date) IS NOT NULL"
+    ).fetchall()
+    con.close()
+    out: dict[str, list[str]] = {}
+    for code, d in rows:
+        out.setdefault(str(code).zfill(5), []).append(str(d))
+    return out
 
 
 def trading_cutoffs(scan_dates: list[str]) -> dict[str, str]:
@@ -44,6 +104,36 @@ def trading_cutoffs(scan_dates: list[str]) -> dict[str, str]:
     return out
 
 
+def _load_holdings_daily() -> dict[str, dict[str, float]]:
+    """Turso `holdings_daily` → {code5: {date: top10%_of_ccass}}。
+
+    自己計：每股每日最大 10 個持倉 ÷ CCASS 總額（of-CCASS 口徑，同 webb
+    records 口徑唔同，所以只做參考欄，唔入 predictor bin）。"""
+    from stockscan.ccass_turso import _client
+
+    per_code: dict[str, dict[str, float]] = {}
+    with _client() as client:
+        rs = client.execute(
+            "SELECT code, data_date, holding_shares FROM holdings_daily "
+            "ORDER BY code, data_date")
+        cur_code, cur_date, top10, total = None, None, [], 0.0
+
+        def flush():
+            if cur_code and cur_date and total > 0:
+                per_code.setdefault(cur_code, {})[cur_date] = round(
+                    sum(top10) / total * 100.0, 4)
+
+        for row in rs.rows:
+            code, d, shares = str(row[0]), str(row[1]), float(row[2] or 0)
+            if (code, d) != (cur_code, cur_date):
+                flush()
+                cur_code, cur_date, top10, total = code, d, [], 0.0
+            top10.append(shares)
+            total += shares
+        flush()
+    return per_code
+
+
 def build(panel_path: Path = PANEL) -> Path:
     panel = pd.read_csv(panel_path, dtype={"code5": str}, encoding="utf-8-sig")
     panel["code5"] = panel["code5"].str.zfill(5)
@@ -53,6 +143,11 @@ def build(panel_path: Path = PANEL) -> Path:
     codes = sorted(pairs["code5"].unique())
     payloads = fetch_stock_payloads(codes)
     series_by_code = {c: concentration_series(p) for c, p in payloads.items()}
+    hd_by_code = _load_holdings_daily()
+    dump_by_code = _load_dump_dailylog()
+    x0 = _load_x0_shares()
+    gap_events = _load_gap_events()
+    print(f"[ccass_feat] dump 源：{len(dump_by_code)} 隻有 dailylog；universe 股數 {len(x0)} 隻")
 
     rows = []
     for r in pairs.itertuples(index=False):
@@ -66,6 +161,12 @@ def build(panel_path: Path = PANEL) -> Path:
             "ccass_top10_delta": "", "ccass_window_days": "",
             "ccass_suspect_denominator": "",
             "ccass_top10_pct_known": 0, "concentration_rising": "",
+            "hd_top10_pct_of_ccass": "", "hd_asof_date": "", "hd_top10_delta": "",
+            "dump_asof_date": "", "dump_c10_shares": "", "dump_issued_shares": "",
+            "dump_top10_pct_of_issued": "", "dump_top10_pct_of_issued_raw": "",
+            "dump_top10_delta_shares": "", "dump_window_days": "",
+            "dump_concentration_rising": "", "dump_corp_action_in_window": 0,
+            "dump_issued_missing": 0,
         }
         if usable:  # records 係由新到舊
             latest, oldest = usable[0], usable[-1]
@@ -86,6 +187,45 @@ def build(panel_path: Path = PANEL) -> Path:
                     row["concentration_rising"] = (
                         1 if delta > RISING_PP else (0 if delta < -RISING_PP else 0.5))
                     # 0.5＝窗口內基本無變（±1pp 內），照列數字唔歸邊
+        # 參考欄：holdings_daily 自己計嘅 of-CCASS top10（口徑唔同，唔入 bin）
+        hd = hd_by_code.get(r.code5) or {}
+        hd_use = sorted(d for d in hd if cutoff and d <= cutoff)
+        if hd_use:
+            new, old = hd[hd_use[-1]], hd[hd_use[0]]
+            row["hd_asof_date"] = hd_use[-1]
+            row["hd_top10_pct_of_ccass"] = new
+            if len(hd_use) >= 2:
+                row["hd_top10_delta"] = round(new - old, 4)
+        # 主力源：Webb dump dailylog（of-issued 口徑，2025-04-01→12-24 逐日）
+        dg = dump_by_code.get(r.code5)
+        dump_use = dg[dg["date"] <= cutoff] if (dg is not None and cutoff) else None
+        if dump_use is not None and len(dump_use):
+            last, first = dump_use.iloc[-1], dump_use.iloc[0]
+            row["dump_asof_date"] = last["date"]
+            row["dump_c10_shares"] = int(last["c10"])
+            issued = _issued_for(x0, r.code5, r.scan_date)
+            if issued:
+                pct = last["c10"] / issued * 100.0
+                row["dump_issued_shares"] = int(issued)
+                row["dump_top10_pct_of_issued_raw"] = round(pct, 4)
+                if len(dump_use) >= 2 and first["c10"]:
+                    row["dump_top10_delta_shares"] = int(last["c10"] - first["c10"])
+                    row["dump_window_days"] = len(dump_use)
+                # anchor 潔淨規則：窗口內「或」窗口後至 universe 快照日（2026-09-07）
+                # 有合股/拆股 → 股數 anchor 受污染，% 唔可信（照 _est 紀律唔入 bin）
+                gaps = [d for d in gap_events.get(r.code5, [])
+                        if first["date"] < d <= "2026-09-07"]
+                row["dump_corp_action_in_window"] = int(bool(gaps))
+                if issued and not gaps and 0.1 <= pct <= 100.0:
+                    row["dump_top10_pct_of_issued"] = round(pct, 4)
+                    if len(dump_use) >= 2 and first["c10"]:
+                        # 股數 anchor 唔變，股數差直接可比：±1pp（以 anchor 股數計）
+                        dsh = last["c10"] - first["c10"]
+                        row["dump_concentration_rising"] = (
+                            1 if dsh > RISING_PP / 100 * issued else
+                            (0 if dsh < -RISING_PP / 100 * issued else 0.5))
+            else:
+                row["dump_issued_missing"] = 1  # 有 c10 冇股數——照列，唔估 %
         rows.append(row)
 
     feat = pd.DataFrame(rows)

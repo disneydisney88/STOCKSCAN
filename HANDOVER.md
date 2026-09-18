@@ -535,6 +535,27 @@ chunked driver（`b346204`）、0xmd 判死記錄（`569695d`）、HANDOVER（`2
   CCASS 日——**所以 predictor 嘅 CCASS 覆蓋天然限於近期 scan_date**，舊行係 unknown（誠實限制，
   將來要深歷史要靠 webb cconchist 日期參數或 CCASS API 修復，唔係今晚管道問題）。
 
+### Webb dump 突破（2026-09-18 凌晨）：CCASS 覆蓋由 1.4% → 92%
+
+KL 提供研究站 Webb CCASS dump（`Downloads\ccass251227\ccassData-2025-12-27-600.sql`，17GB，
+Webb 官方 ccass DB 導出，含 dailylog 每日集中度 2018-01→2025-12-24）。用現成
+`extract_webb_dump.py` 對面板全 1,226 隻重抽（`--from 2025-04-01`，掃 17GB 兩次只花 10 分鐘）：
+1,220 隻對到 issueID（6 隻 dump 冇：01641/02671/03418/03428/03444/08090）。
+
+- `build_concentration_features.py` 加 dump 源：`dump_top10_pct_of_issued`＝c10 ÷ universe.csv
+  股數 anchor（of-issued 口徑）；**anchor 潔淨規則**＝窗口內或窗口後至 2026-09-07 有合股/拆股、
+  或 pct 出唔到 0.1-100% 常理界 → 唔入 bin（照 _est 紀律；raw 照存）。
+- 覆蓋：**3,730/4,036 行（92%）潔淨**，208 行財技窗口排除，中位 53.7%（3.9-100%）。
+- 診斷教訓：dump dailylog 欄序係 (atDate, issueID, ...) 同 extractor 舊 subset 假設唔同；
+  要讀過濾版 dailylog.csv，唔好讀 db raw 表（9.6M 行全交所，code 對照唔可靠）。
+- 主站 webb-site.com 實測可達（200）——mirror ban 時嘅後備驗證源。
+
+### CCASS bin lift（dump 源，只列數字；baseline GO 2.70%／perform 39.63%）
+
+led_to_go_180d：top10<20% lift **1.84**（n=442，go_rate 4.98%）／20-40% 1.05／40-60% 0.54／>=60% 1.03；
+rising 0.79／flat 1.18／falling 1.04。led_to_perform：各 bin lift 0.84-1.09（<20% 1.09 最好，
+rising 0.98 最差），級別效應遠細過 GO 表。
+
 ### 晨早 runbook（未完部分）
 1. `python scripts/warm_chunked_v2.py`（idempotent，會 retry 非 OK；現 341/1,226 OK，871 待 retry）
 2. pending=0 後：`python scripts/build_concentration_features.py` → `python scripts/build_go_predictors.py`

@@ -21,6 +21,8 @@ FEATURES = [
     "recurrence", "board",
     # P6b PART 2：CCASS 集中度（直連 Turso，T-2 交易日 cutoff 防未來函數）
     "ccass_top10_pct", "concentration_rising",
+    # Webb dump dailylog（of-issued 口徑，2025-04→12 覆蓋面板前半）
+    "dump_top10_pct_of_issued", "dump_concentration_rising",
 ]
 
 PANEL = ROOT / "data" / "eod" / "radar_eod_panel_full.csv"
@@ -59,7 +61,8 @@ def _asof_features(df: pd.DataFrame) -> pd.DataFrame:
         cf = cf.drop_duplicates(["code5", "scan_date"])
         d = d.merge(cf.drop(columns=["ccass_top10_pct_known"]), on=["code5", "scan_date"],
                     how="left")
-    for c in ("ccass_top10_pct", "concentration_rising", "ccass_top10_delta"):
+    for c in ("ccass_top10_pct", "concentration_rising", "ccass_top10_delta",
+              "dump_top10_pct_of_issued", "dump_concentration_rising"):
         if c not in d:
             d[c] = np.nan
     # Absent upstream feeds remain explicitly null rather than being guessed.
@@ -127,6 +130,15 @@ def _groups(s: pd.Series, feature: str) -> pd.Series:
                       labels=["<30%", "30-50%", "50-70%", ">=70%"]).astype(object).where(
                           x.notna(), "unknown")
     if feature == "concentration_rising":
+        x = pd.to_numeric(s, errors="coerce")
+        label = x.map({1.0: "rising(>+1pp)", 0.5: "flat(±1pp)", 0.0: "falling(<-1pp)"})
+        return label.where(x.notna(), "unknown")
+    if feature == "dump_top10_pct_of_issued":
+        x = pd.to_numeric(s, errors="coerce")
+        return pd.cut(x, [-np.inf, 20, 40, 60, np.inf],
+                      labels=["<20%", "20-40%", "40-60%", ">=60%"]).astype(object).where(
+                          x.notna(), "unknown")
+    if feature == "dump_concentration_rising":
         x = pd.to_numeric(s, errors="coerce")
         label = x.map({1.0: "rising(>+1pp)", 0.5: "flat(±1pp)", 0.0: "falling(<-1pp)"})
         return label.where(x.notna(), "unknown")
