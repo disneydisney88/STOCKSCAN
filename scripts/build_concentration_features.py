@@ -30,7 +30,12 @@ from stockscan.io_utils import today_hkt, write_csv  # noqa: E402
 PANEL = ROOT / "data" / "eod" / "radar_eod_panel_full.csv"
 REPORTS = ROOT / "data" / "reports"
 DUMP_DB = Path(r"C:\Users\klcho\Downloads\ccass251227\webb_extract_panel\webb_subset.db")
-DUMP_CSV = Path(r"C:\Users\klcho\Downloads\ccass251227\webb_extract_panel\dailylog.csv")
+# dump 源路徑：舊位（Downloads）被清（09-19 事故）。新 dump 抽完放 _data/ 或設定
+# WEBB_DUMP_DAILYLOG 環境變數；冇檔案就自動跳過 dump 源（features 靠 git 存檔版本）
+import os as _os
+DUMP_CSV = Path(_os.getenv(
+    "WEBB_DUMP_DAILYLOG",
+    str(ROOT / "_data" / "webb_extract_panel" / "dailylog.csv")))
 X0_SHARES = ROOT / "data" / "raw" / "shares_outstanding_panel_X0.csv"
 LAG_TRADING_DAYS = 2
 RISING_PP = 1.0
@@ -57,11 +62,21 @@ def _load_dump_dailylog() -> dict[str, pd.DataFrame]:
 
 
 def _load_x0_shares() -> pd.DataFrame:
-    """已發行股數 anchor：data/universe.csv total_shares（單一快照，2026-09 口徑）。
+    """逐日已發行股數：任務 X1 產出 `RTSS\\codex\\shares_outstanding_daily.csv`
+    （671,880 行，2025-05-02→2026-09-01，OK/pre_history/no_data 口徑）。
 
-    2025H2 窗口用同一 anchor；窗口內有合股/拆股嘅行會標 dump_corp_action_in_window=1
-    （下游 bin 視為唔潔排除，照追蹤簿 _est 紀律）。X0 檔只有 30 隻 pilot，唔夠用。"""
-    uni = pd.read_csv(ROOT / "data" / "universe.csv", dtype={"code5": str}, encoding="utf-8-sig")
+    逐日股數令 of-issued % 喺合股/拆股前後都一致（c10 同股數同日同口徑），
+    汰除單一快照 anchor 嘅污染問題。fallback：universe.csv 單一快照。"""
+    daily = Path(r"G:\我的雲端硬碟\RTSS\codex\shares_outstanding_daily.csv")
+    if daily.exists():
+        s = pd.read_csv(daily, dtype={"code": str}, encoding="utf-8-sig")
+        s = s[(s.get("status") == "OK") & s["shares_outstanding"].notna()]
+        s["code5"] = s["code"].astype(str).str.zfill(5)
+        s["shares"] = pd.to_numeric(s["shares_outstanding"], errors="coerce")
+        s = s[s["shares"] > 0]
+        return s.set_index(["code5", "date"])["shares"]
+    uni = pd.read_csv(ROOT / "data" / "universe.csv", dtype={"code5": str},
+                      encoding="utf-8-sig")
     uni = uni[uni["code5"].notna()].copy()
     uni["code5"] = uni["code5"].str.zfill(5)
     uni["shares"] = pd.to_numeric(uni["total_shares"], errors="coerce")
@@ -69,8 +84,16 @@ def _load_x0_shares() -> pd.DataFrame:
 
 
 def _issued_for(x0: pd.Series, code: str, scan_date: str):
-    """anchor 股數（單一快照——窗口內有財技嘅行由 corp-action flag 處理）。"""
-    v = x0.get(code)
+    """c10 紀錄當日嘅已發行股數（逐日首選；單一快照 fallback 時 scan_date 無關）。"""
+    try:
+        v = x0.get((code, scan_date))
+    except (KeyError, TypeError):
+        v = None
+    if v is None or pd.isna(v) or v <= 0:
+        try:
+            v = x0.get(code)  # fallback：Series 無 MultiIndex（單一快照）
+        except Exception:
+            v = None
     return float(v) if v is not None and pd.notna(v) and v > 0 else None
 
 
@@ -203,7 +226,8 @@ def build(panel_path: Path = PANEL) -> Path:
             last, first = dump_use.iloc[-1], dump_use.iloc[0]
             row["dump_asof_date"] = last["date"]
             row["dump_c10_shares"] = int(last["c10"])
-            issued = _issued_for(x0, r.code5, r.scan_date)
+            # 逐日股數（任務 X1）：c10 同股數同日同口徑，合股前後一致
+            issued = _issued_for(x0, r.code5, last["date"])
             if issued:
                 pct = last["c10"] / issued * 100.0
                 row["dump_issued_shares"] = int(issued)
@@ -211,19 +235,17 @@ def build(panel_path: Path = PANEL) -> Path:
                 if len(dump_use) >= 2 and first["c10"]:
                     row["dump_top10_delta_shares"] = int(last["c10"] - first["c10"])
                     row["dump_window_days"] = len(dump_use)
-                # anchor 潔淨規則：窗口內「或」窗口後至 universe 快照日（2026-09-07）
-                # 有合股/拆股 → 股數 anchor 受污染，% 唔可信（照 _est 紀律唔入 bin）
-                gaps = [d for d in gap_events.get(r.code5, [])
-                        if first["date"] < d <= "2026-09-07"]
-                row["dump_corp_action_in_window"] = int(bool(gaps))
-                if issued and not gaps and 0.1 <= pct <= 100.0:
-                    row["dump_top10_pct_of_issued"] = round(pct, 4)
-                    if len(dump_use) >= 2 and first["c10"]:
-                        # 股數 anchor 唔變，股數差直接可比：±1pp（以 anchor 股數計）
-                        dsh = last["c10"] - first["c10"]
+                    issued0 = _issued_for(x0, r.code5, first["date"])
+                    gaps = [d for d in gap_events.get(r.code5, [])
+                            if first["date"] < d <= "2026-09-07"]
+                    row["dump_corp_action_in_window"] = int(bool(gaps))
+                    if issued0 and 0.1 <= pct <= 100.0:
+                        pct0 = first["c10"] / issued0 * 100.0
+                        row["dump_top10_pct_of_issued"] = round(pct, 4)
+                        delta = pct - pct0  # 兩端各自用當日股數，% 直接可比
                         row["dump_concentration_rising"] = (
-                            1 if dsh > RISING_PP / 100 * issued else
-                            (0 if dsh < -RISING_PP / 100 * issued else 0.5))
+                            1 if delta > RISING_PP else
+                            (0 if delta < -RISING_PP else 0.5))
             else:
                 row["dump_issued_missing"] = 1  # 有 c10 冇股數——照列，唔估 %
         rows.append(row)

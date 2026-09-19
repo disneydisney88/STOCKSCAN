@@ -24,7 +24,7 @@ REPORTS = ROOT / "data" / "reports"
 
 
 def main() -> int:
-    rec_files = sorted(REPORTS.glob("recurrence_*.csv"))
+    rec_files = sorted(REPORTS.glob("recurrence_????????.csv"))
     if not rec_files:
         raise SystemExit("未有 recurrence_*.csv——先跑 scripts/analyze_recurrence.py")
     rec = pd.read_csv(rec_files[-1], dtype={"code5": str}, encoding="utf-8-sig")
