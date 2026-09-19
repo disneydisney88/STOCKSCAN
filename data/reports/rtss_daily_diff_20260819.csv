@@ -1,0 +1,9 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,01176,3億以下急升異動 [當日第1次] 珠光控股,3,0,SURGE,,2026-08-19 10:13:18,3.0,63.64,mcap_over_3e8
+rtss_only,01233,3億以下急升異動 [當日第1次] 时代中国控股,1,0,SURGE,,2026-08-19 10:07:10,1.0,24.24,daemon_or_definition_difference
+rtss_only,01400,3億以下急升異動 [當日第1次] 满地科技股份,1,0,SURGE,,2026-08-19 11:02:44,1.0,20.0,daemon_or_definition_difference
+rtss_only,01796,3億以下急升異動 [當日第1次] 中国数智科技,1,0,SURGE,,2026-08-19 11:16:54,1.0,64.38,daemon_or_definition_difference
+rtss_only,02231,3億以下急升異動 [當日第1次] 景业名邦集团,1,0,SURGE,,2026-08-19 16:05:19,1.0,27.27,daemon_or_definition_difference
+rtss_only,02370,3億以下急升異動 [當日第1次] 力高健康生活,1,0,SURGE,,2026-08-19 14:12:05,1.0,25.74,daemon_or_definition_difference
+rtss_only,03639,3億以下急升異動 [當日第1次] 亿达中国,3,0,SURGE,,2026-08-19 14:37:05,3.0,45.83,daemon_or_definition_difference
+rtss_only,06158,3億以下急升異動 [當日第1次] 正荣地产,2,0,SURGE,,2026-08-19 10:01:03,2.0,33.33,mcap_over_3e8

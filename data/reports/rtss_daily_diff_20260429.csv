@@ -1,0 +1,7 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,00911,3億以下急升異動 [當日第1次] 前海健康,3,0,SURGE,,2026-04-29 11:13:06,5.0,96.61,daemon_or_definition_difference
+rtss_only,01472,3億以下急升異動 [當日第1次] 生兴控股,3,0,SURGE,,2026-04-29 15:05:10,3.0,46.51,daemon_or_definition_difference
+rtss_only,01682,3億以下急升異動 [當日第1次] 杭品生活科技,1,0,SURGE,,2026-04-29 10:06:34,1.0,32.62,daemon_or_definition_difference
+rtss_only,02936,3億以下急升異動 [當日第1次] 智算能建股权,1,0,SURGE,,2026-04-29 15:23:51,1.0,136.67,daemon_or_definition_difference
+rtss_only,03997,3億以下急升異動 [當日第1次] 电讯首科,1,0,SURGE,,2026-04-29 15:55:08,1.0,20.0,daemon_or_definition_difference
+rtss_only,06978,急跌監察警報！ 永泰生物-B,2,0,UNKNOWN,,2026-04-29 09:16:25,,,mcap_over_3e8;turnover_below_500k

@@ -1,0 +1,6 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,01825,3億以下急升異動 [當日第1次] STERLING GP,6,0,SURGE,,2026-08-03 10:43:51,6.0,144.57,daemon_or_definition_difference
+rtss_only,01843,3億以下急升異動 [當日第1次] 快餐帝国,1,0,SURGE,,2026-08-03 11:33:18,1.0,22.64,daemon_or_definition_difference
+rtss_only,02215,3億以下急升異動 [當日第1次] 德信服务集团,1,0,SURGE,,2026-08-03 10:06:51,1.0,166.67,daemon_or_definition_difference
+rtss_only,02320,3億以下急升異動 [當日第1次] 合丰集团,2,0,SURGE,,2026-08-03 10:44:01,2.0,67.74,daemon_or_definition_difference
+rtss_only,08079,3億以下急升異動 [當日第1次] 曌生命,2,0,SURGE,,2026-08-03 15:07:45,2.0,35.38,daemon_or_definition_difference

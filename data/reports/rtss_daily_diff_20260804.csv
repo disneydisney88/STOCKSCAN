@@ -1,0 +1,5 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,00261,3億以下急升異動 [當日第1次] GBA集团,1,0,SURGE,,2026-08-04 10:06:30,1.0,21.0,daemon_or_definition_difference
+rtss_only,01825,3億以下急升異動 [當日第1次] STERLING GP,1,0,SURGE,,2026-08-04 15:38:12,1.0,22.45,daemon_or_definition_difference
+rtss_only,02215,3億以下急升異動 [當日第1次] 德信服务集团,5,0,SURGE,,2026-08-04 09:54:40,5.0,111.92,daemon_or_definition_difference
+rtss_only,03301,3億以下急升異動 [當日第1次] 融信中国,1,0,SURGE,,2026-08-04 11:46:04,1.0,45.28,daemon_or_definition_difference

@@ -1,0 +1,7 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,00022,茂盛控股,1,0,SURGE,,2026-09-16 10:33:24,1.0,28.0,daemon_or_definition_difference
+rtss_only,01134,恒发光学,2,0,SURGE,,2026-09-16 15:19:57,2.0,35.96,daemon_or_definition_difference
+rtss_only,01351,辉煌明天,2,0,SURGE,,2026-09-16 09:55:30,2.0,41.42,daemon_or_definition_difference
+rtss_only,01750,全达电器集团控股,1,0,SURGE,,2026-09-16 13:28:47,1.0,39.56,daemon_or_definition_difference
+rtss_only,01870,绿色电能集团,2,0,SURGE,,2026-09-16 14:24:10,2.0,31.58,daemon_or_definition_difference
+rtss_only,08305,圣唐控股,1,0,SURGE,,2026-09-16 09:48:55,1.0,23.73,daemon_or_definition_difference

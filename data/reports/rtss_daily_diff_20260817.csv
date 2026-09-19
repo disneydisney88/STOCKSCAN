@@ -1,0 +1,5 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,00889,3億以下急升異動 [當日第1次] 连达科技控股,1,0,SURGE,,2026-08-17 15:13:52,1.0,28.57,daemon_or_definition_difference
+rtss_only,01429,3億以下急升異動 [當日第1次] 天任集团,1,0,SURGE,,2026-08-17 09:49:10,1.0,24.17,daemon_or_definition_difference
+rtss_only,01725,3億以下急升異動 [當日第1次] 中国技术集团,1,0,SURGE,,2026-08-17 10:20:16,1.0,21.05,daemon_or_definition_difference
+rtss_only,08221,3億以下急升異動 [當日第1次] 高裕金融,1,0,SURGE,,2026-08-17 15:58:06,1.0,37.88,daemon_or_definition_difference

@@ -1,0 +1,4 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,00110,3億以下急升異動 [當日第1次] 中国长远,1,0,SURGE,,2026-07-14 15:32:58,1.0,23.91,daemon_or_definition_difference
+rtss_only,01870,3億以下急升異動 [當日第1次] 益美国际控股,1,0,SURGE,,2026-07-14 10:38:17,1.0,27.98,daemon_or_definition_difference
+rtss_only,08123,3億以下急升異動 [當日第1次] 华亿金控,1,0,SURGE,,2026-07-14 15:41:08,1.0,21.74,daemon_or_definition_difference

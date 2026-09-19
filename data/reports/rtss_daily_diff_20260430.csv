@@ -1,0 +1,8 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,01162,3億以下急升異動 [當日第1次] 莹岚集团,1,0,SURGE,,2026-04-30 15:14:55,1.0,34.83,daemon_or_definition_difference
+rtss_only,01912,3億以下急升異動 [當日第1次] 康特隆,2,0,SURGE,,2026-04-30 13:09:57,2.0,43.53,daemon_or_definition_difference
+rtss_only,02659,急跌監察警報！ 宝济药业-B,1,0,UNKNOWN,,2026-04-30 13:12:35,,,mcap_over_3e8
+rtss_only,08281,3億以下急升異動 [當日第1次] 中国金典集团,1,0,SURGE,,2026-04-30 10:14:16,1.0,110.71,daemon_or_definition_difference
+rtss_only,08436,3億以下急升異動 [當日第1次] 德宝集团控股,1,0,SURGE,,2026-04-30 11:40:56,1.0,25.86,daemon_or_definition_difference
+rtss_only,09958,3億以下急升異動 [當日第1次] 力天影业,1,0,SURGE,,2026-04-30 16:05:01,1.0,24.29,daemon_or_definition_difference
+rtss_only,09982,3億以下急升異動 [當日第1次] 中原建业,3,0,SURGE,,2026-04-30 09:38:45,1.0,28.81,daemon_or_definition_difference

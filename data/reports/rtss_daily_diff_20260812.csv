@@ -1,0 +1,5 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,00875,3億以下急升異動 [當日第1次] 从玉智农,3,0,SURGE,,2026-08-12 10:06:38,3.0,51.85,daemon_or_definition_difference
+rtss_only,01825,3億以下急升異動 [當日第1次] STERLING GP,1,0,SURGE,,2026-08-12 15:21:52,1.0,20.06,daemon_or_definition_difference
+rtss_only,02113,3億以下急升異動 [當日第1次] 世纪集团国际,1,0,SURGE,,2026-08-12 15:53:19,1.0,20.31,daemon_or_definition_difference
+rtss_only,08191,3億以下急升異動 [當日第1次] 鸿伟亚洲,1,0,SURGE,,2026-08-12 15:14:22,1.0,20.56,daemon_or_definition_difference

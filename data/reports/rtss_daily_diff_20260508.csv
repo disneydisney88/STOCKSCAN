@@ -1,0 +1,6 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,00139,3億以下急升異動 [當日第1次] 小鱼盈通,1,0,SURGE,,2026-05-08 14:43:59,1.0,21.24,daemon_or_definition_difference
+rtss_only,00821,3億以下急升異動 [當日第1次] 汇盈控股,4,0,SURGE,,2026-05-08 14:44:15,4.0,73.91,daemon_or_definition_difference
+rtss_only,06928,3億以下急升異動 [當日第1次] 万马控股,2,0,SURGE,,2026-05-08 10:37:43,2.0,34.53,daemon_or_definition_difference
+rtss_only,08160,3億以下急升異動 [當日第1次] GOLDWAY EDU,1,0,SURGE,,2026-05-08 15:24:14,1.0,23.53,daemon_or_definition_difference
+rtss_only,08400,3億以下急升異動 [當日第1次] 亚洲先锋娱乐,2,0,SURGE,,2026-05-08 11:18:36,2.0,90.59,daemon_or_definition_difference

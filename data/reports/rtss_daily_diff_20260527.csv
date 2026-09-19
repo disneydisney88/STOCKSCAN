@@ -1,0 +1,4 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,01162,3億以下急升異動 [當日第1次] 莹岚集团,1,0,SURGE,,2026-05-27 15:16:24,1.0,21.16,daemon_or_definition_difference
+rtss_only,02028,3億以下急升異動 [當日第1次] 映美控股,1,0,SURGE,,2026-05-27 09:49:09,1.0,60.15,daemon_or_definition_difference
+rtss_only,08268,3億以下急升異動 [當日第1次] 智城发展控股,1,0,SURGE,,2026-05-27 13:17:37,1.0,22.36,daemon_or_definition_difference

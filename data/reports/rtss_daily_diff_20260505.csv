@@ -1,0 +1,14 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,00118,3億以下急升異動 [當日第1次] 大同机械,3,0,SURGE,,2026-05-05 10:44:20,3.0,105.13,mcap_over_3e8
+rtss_only,00243,3億以下急升異動 [當日第4次(57%→75%)] QPL INT'L,5,0,SURGE,,2026-05-05 09:44:15,4.0,75.47,mcap_over_3e8
+rtss_only,00399,3億以下急升異動 [當日第1次] 星太链集团,2,0,SURGE,,2026-05-05 10:03:50,2.0,81.82,mcap_over_3e8
+rtss_only,00725,3億以下急升異動 [當日第1次] 恒都集团,1,0,SURGE,,2026-05-05 14:48:57,1.0,38.82,daemon_or_definition_difference
+rtss_only,01284,3億以下急升異動 [當日第1次] 新传企划,1,0,SURGE,,2026-05-05 15:02:14,1.0,25.68,daemon_or_definition_difference
+rtss_only,01341,3億以下急升異動 [當日第1次] 昊天国际建投,2,0,SURGE,,2026-05-05 10:17:18,2.0,31.58,daemon_or_definition_difference
+rtss_only,01633,3億以下急升異動 [當日第1次] 上谕集团,2,0,SURGE,,2026-05-05 11:49:58,2.0,35.71,mcap_over_3e8
+rtss_only,01843,3億以下急升異動 [當日第1次] 快餐帝国,2,0,SURGE,,2026-05-05 10:51:41,2.0,35.2,daemon_or_definition_difference
+rtss_only,01932,3億以下急升異動 [當日第1次] 中漆集团,6,0,SURGE,,2026-05-05 14:15:47,6.0,97.37,mcap_over_3e8
+rtss_only,06080,3億以下急升異動 [當日第1次] 荣智控股,1,0,SURGE,,2026-05-05 15:55:46,1.0,22.73,daemon_or_definition_difference
+rtss_only,08439,3億以下急升異動 [當日第1次] 新百利融资,4,0,SURGE,,2026-05-05 09:58:13,4.0,188.37,mcap_over_3e8
+rtss_only,08490,3億以下急升異動 [當日第1次] 骏码半导体,3,0,SURGE,,2026-05-05 14:29:47,3.0,94.39,daemon_or_definition_difference
+rtss_only,08529,3億以下急升異動 [當日第1次] 优博控股,2,0,SURGE,,2026-05-05 13:30:36,2.0,39.22,daemon_or_definition_difference

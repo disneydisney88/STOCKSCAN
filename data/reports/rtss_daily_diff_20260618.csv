@@ -1,0 +1,5 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,00889,3億以下急升異動 [當日第1次] 连达科技控股,1,0,SURGE,,2026-06-18 14:10:03,1.0,22.95,daemon_or_definition_difference
+rtss_only,00899,3億以下急升異動 [當日第1次] 中加国信,1,0,SURGE,,2026-06-18 11:10:11,1.0,22.81,daemon_or_definition_difference
+rtss_only,01134,3億以下急升異動 [當日第1次] 恒发光学,4,0,SURGE,,2026-06-18 09:38:01,4.0,71.43,daemon_or_definition_difference
+rtss_only,08226,3億以下急升異動 [當日第1次] 树熊金融集团,1,0,SURGE,,2026-06-18 15:44:30,1.0,24.0,daemon_or_definition_difference

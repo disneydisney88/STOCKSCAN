@@ -1,0 +1,3 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,00524,3億以下急升異動 [當日第1次] 长城天下,1,0,SURGE,,2026-04-27 10:13:23,1.0,76.36,daemon_or_definition_difference
+rtss_only,00911,3億以下急升異動 [當日第1次] 前海健康,1,0,SURGE,,2026-04-27 10:19:41,1.0,48.78,daemon_or_definition_difference

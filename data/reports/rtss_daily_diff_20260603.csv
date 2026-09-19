@@ -1,0 +1,12 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,00243,3億以下急升異動 [當日第1次] QPL INT'L,1,0,SURGE,,2026-06-03 14:07:33,1.0,21.67,daemon_or_definition_difference
+rtss_only,00385,3億以下急升異動 [當日第1次] 建联集团,1,0,SURGE,,2026-06-03 11:52:53,1.0,35.19,daemon_or_definition_difference
+rtss_only,00605,3億以下急升異動 [當日第1次] 中国金融投资管理,1,0,SURGE,,2026-06-03 10:19:31,1.0,25.33,daemon_or_definition_difference
+rtss_only,00865,3億以下急升異動 [當日第1次] 建德国际控股,1,0,SURGE,,2026-06-03 14:01:21,1.0,37.84,daemon_or_definition_difference
+rtss_only,00889,3億以下急升異動 [當日第1次] 连达科技控股,2,0,SURGE,,2026-06-03 13:11:22,2.0,34.25,mcap_over_3e8
+rtss_only,00953,3億以下急升異動 [當日第1次] 邵氏兄弟控股,1,0,SURGE,,2026-06-03 14:45:08,1.0,29.45,mcap_over_3e8
+rtss_only,01468,3億以下急升異動 [當日第1次] 嘉高达资本,1,0,SURGE,,2026-06-03 15:28:30,1.0,21.54,daemon_or_definition_difference
+rtss_only,01771,3億以下急升異動 [當日第1次] 新丰泰集团,2,0,SURGE,,2026-06-03 10:13:36,2.0,78.57,daemon_or_definition_difference
+rtss_only,02258,3億以下急升異動 [當日第1次] 华滋国际海洋,3,0,SURGE,,2026-06-03 09:48:53,3.0,220.75,mcap_over_3e8
+rtss_only,08268,3億以下急升異動 [當日第1次] 智城发展控股,1,0,SURGE,,2026-06-03 14:58:06,1.0,29.41,daemon_or_definition_difference
+rtss_only,09968,3億以下急升異動 [當日第1次] 汇景控股,1,0,SURGE,,2026-06-03 15:10:29,1.0,22.86,daemon_or_definition_difference

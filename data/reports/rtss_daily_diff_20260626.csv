@@ -1,0 +1,6 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,01087,3億以下急升異動 [當日第1次] 威讯控股,2,0,SURGE,,2026-06-26 15:30:22,2.0,43.9,daemon_or_definition_difference
+rtss_only,01156,3億以下急升異動 [當日第1次] CHINANEWENERGY,1,0,SURGE,,2026-06-26 10:13:49,1.0,24.39,daemon_or_definition_difference
+rtss_only,01540,3億以下急升異動 [當日第1次] 澳狮环球,1,0,SURGE,,2026-06-26 09:55:26,1.0,34.18,daemon_or_definition_difference
+rtss_only,08406,3億以下急升異動 [當日第1次] 中国口腔产业,1,0,SURGE,,2026-06-26 15:18:05,1.0,27.87,daemon_or_definition_difference
+rtss_only,08620,3億以下急升異動 [當日第1次] 亚洲速运,1,0,SURGE,,2026-06-26 10:14:45,1.0,55.34,daemon_or_definition_difference

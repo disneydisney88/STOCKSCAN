@@ -1,0 +1,6 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,01340,3億以下急升異動 [當日第1次] 惠生国际,1,0,SURGE,,2026-05-21 09:51:55,1.0,49.12,daemon_or_definition_difference
+rtss_only,02022,3億以下急升異動 [當日第1次] 游莱互动,1,0,SURGE,,2026-05-21 13:16:02,1.0,20.0,daemon_or_definition_difference
+rtss_only,02477,急跌監察警報！ 经纬天地(新),1,0,UNKNOWN,,2026-05-21 10:17:54,,,mcap_over_3e8
+rtss_only,02940,急跌監察警報！ 经纬天地(旧),1,0,UNKNOWN,,2026-05-21 10:17:58,,,mcap_over_3e8
+rtss_only,08042,3億以下急升異動 [當日第1次] 高奥士人才集团,1,0,SURGE,,2026-05-21 10:23:42,1.0,47.37,daemon_or_definition_difference

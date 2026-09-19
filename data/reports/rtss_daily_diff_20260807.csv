@@ -1,0 +1,5 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,01536,3億以下急升異動 [當日第1次] 煜荣集团,1,0,SURGE,,2026-08-07 13:29:02,1.0,34.52,daemon_or_definition_difference
+rtss_only,02286,3億以下急升異動 [當日第1次] 辰兴发展,1,0,SURGE,,2026-08-07 10:44:46,1.0,73.68,daemon_or_definition_difference
+rtss_only,03919,3億以下急升異動 [當日第1次] 金力集团,3,0,SURGE,,2026-08-07 09:30:30,3.0,54.74,daemon_or_definition_difference
+rtss_only,08529,3億以下急升異動 [當日第1次] 优博控股,2,0,SURGE,,2026-08-07 10:38:55,2.0,32.21,daemon_or_definition_difference

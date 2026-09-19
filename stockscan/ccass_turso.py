@@ -21,8 +21,10 @@ def _client():
     except ImportError as exc:  # pragma: no cover
         raise RuntimeError("libsql-client 未安裝（pip install libsql-client）") from exc
     load_secrets_env()
-    url = os.environ["TURSO_DATABASE_URL"].strip()
-    token = os.environ["TURSO_AUTH_TOKEN"].strip()
+    from stockscan.io_utils import get_secret
+
+    url = get_secret("TURSO_DATABASE_URL")
+    token = get_secret("TURSO_AUTH_TOKEN")
     if not url or not token:
         raise RuntimeError("TURSO_DATABASE_URL／TURSO_AUTH_TOKEN 未設定（正印：repo _secrets/.env）")
     if url.lower().startswith("libsql://"):

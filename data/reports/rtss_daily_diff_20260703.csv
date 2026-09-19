@@ -1,0 +1,4 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,00653,3億以下急升異動 [當日第1次] 卓悦控股,6,0,SURGE,,2026-07-03 09:48:40,6.0,147.83,daemon_or_definition_difference
+rtss_only,01160,3億以下急升異動 [當日第1次] 金石资本集团,1,0,SURGE,,2026-07-03 13:40:36,1.0,60.0,daemon_or_definition_difference
+rtss_only,06163,3億以下急升異動 [當日第1次] 彭顺国际,1,0,SURGE,,2026-07-03 16:01:40,1.0,42.55,daemon_or_definition_difference

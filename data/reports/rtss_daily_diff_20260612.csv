@@ -1,0 +1,9 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,00355,3億以下急升異動 [當日第1次] 世纪城市国际,1,0,SURGE,,2026-06-12 09:55:18,1.0,23.53,daemon_or_definition_difference
+rtss_only,00381,3億以下急升異動 [當日第1次] 权识国际,1,0,SURGE,,2026-06-12 13:17:18,1.0,25.0,daemon_or_definition_difference
+rtss_only,00426,3億以下急升異動 [當日第1次] 万华媒体,3,0,SURGE,,2026-06-12 15:37:57,3.0,85.71,daemon_or_definition_difference
+rtss_only,01259,3億以下急升異動 [當日第1次] 未来发展控股,1,0,SURGE,,2026-06-12 10:14:02,1.0,21.21,daemon_or_definition_difference
+rtss_only,01323,3億以下急升異動 [當日第1次] 华盛国际控股,4,0,SURGE,,2026-06-12 09:36:30,4.0,70.37,daemon_or_definition_difference
+rtss_only,01340,3億以下急升異動 [當日第1次] 惠生国际,1,0,SURGE,,2026-06-12 10:55:32,1.0,29.47,daemon_or_definition_difference
+rtss_only,01613,3億以下急升異動 [當日第1次] 协同通信,3,0,SURGE,,2026-06-12 10:01:43,3.0,50.0,mcap_over_3e8
+rtss_only,02370,3億以下急升異動 [當日第1次] 力高健康生活,1,0,SURGE,,2026-06-12 15:17:55,1.0,26.21,daemon_or_definition_difference

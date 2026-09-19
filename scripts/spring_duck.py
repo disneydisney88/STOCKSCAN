@@ -41,7 +41,20 @@ def build() -> pd.DataFrame:
     if "ccass_top10_pct_t2" not in panel.columns:
         panel["ccass_top10_pct_t2"] = None
     cc = pd.to_numeric(panel["ccass_top10_pct_t2"], errors="coerce")
-    panel["spring_duck_flag"] = ((panel["has_broker_shot"] == 1) | cc.notna()).astype(int)
+    # P6c：用 ccass_concentration_features 補 Top10%（T-2 對齊 + Webb dump of-issued）
+    # ——兌現 B1「CCASS Top10 待 M7 通後自動補」。字典變化：CCASS 證據改用
+    # 「Top10 >= 60%（歸邊）」而唔係「有資料就算」，否則全覆蓋後 flag 會變相全 1。
+    feat_p = DATA_DIR / "reports" / "ccass_concentration_features.csv"
+    if feat_p.exists():
+        cf = pd.read_csv(feat_p, dtype={"code5": str}, encoding="utf-8-sig")
+        cf["cc10"] = pd.to_numeric(cf.get("ccass_top10_pct"), errors="coerce")
+        cf["dump_raw"] = pd.to_numeric(cf.get("dump_top10_pct_of_issued_raw"), errors="coerce")
+        cf["top10_fill"] = cf["cc10"].fillna(cf["dump_raw"])
+        cf = cf[["code5", "scan_date", "top10_fill"]].drop_duplicates(["code5", "scan_date"])
+        panel = panel.merge(cf, on=["code5", "scan_date"], how="left")
+        cc = cc.fillna(pd.to_numeric(panel["top10_fill"], errors="coerce"))
+    panel["spring_duck_flag"] = (
+        (panel["has_broker_shot"] == 1) | (cc >= 60)).astype(int)
     panel["top10_pct"] = cc
     cols = ["scan_date", "code5", "name", "close", "chg_pct", "turnover_day",
             "mcap_total", "ratio", "top10_pct", "has_broker_shot", "spring_duck_flag"]

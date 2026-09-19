@@ -1,0 +1,5 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,00261,3億以下急升異動 [當日第1次] GBA集团,1,0,SURGE,,2026-07-10 15:33:38,1.0,21.25,daemon_or_definition_difference
+rtss_only,02663,3億以下急升異動 [當日第1次] 应力控股,1,0,SURGE,,2026-07-10 15:34:09,1.0,20.0,daemon_or_definition_difference
+rtss_only,02980,3億以下急升異動 [當日第1次] 丰展控股股权,1,0,SURGE,,2026-07-10 10:39:23,1.0,200.0,daemon_or_definition_difference
+rtss_only,03789,3億以下急升異動 [當日第1次] 御佳控股,2,0,SURGE,,2026-07-10 11:54:02,2.0,35.42,mcap_over_3e8

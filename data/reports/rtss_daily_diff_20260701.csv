@@ -1,0 +1,4 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,00139,3億以下急升異動 [當日第1次] 小鱼盈通,1,0,SURGE,,2026-07-01 09:17:18,1.0,23.89,daemon_or_definition_difference
+rtss_only,01966,3億以下急升異動 [當日第1次] 中骏集团控股,1,0,SURGE,,2026-07-01 09:17:46,1.0,39.13,daemon_or_definition_difference
+rtss_only,08547,3億以下急升異動 [當日第1次] PACIFIC LEGEND,1,0,SURGE,,2026-07-01 09:19:22,1.0,20.99,daemon_or_definition_difference

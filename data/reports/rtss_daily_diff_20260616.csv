@@ -1,0 +1,4 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,00328,3億以下急升異動 [當日第1次] ALCO HOLDINGS,1,0,SURGE,,2026-06-16 09:55:22,1.0,20.0,daemon_or_definition_difference
+rtss_only,01323,3億以下急升異動 [當日第1次] 华盛国际控股,1,0,SURGE,,2026-06-16 11:09:32,1.0,22.62,daemon_or_definition_difference
+rtss_only,01613,3億以下急升異動 [當日第1次] 协同通信,1,0,SURGE,,2026-06-16 10:15:57,1.0,25.33,daemon_or_definition_difference

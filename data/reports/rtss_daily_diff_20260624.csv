@@ -1,0 +1,5 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,01323,3億以下急升異動 [當日第1次] 华盛国际控股,2,0,SURGE,,2026-06-24 15:37:20,2.0,37.97,daemon_or_definition_difference
+rtss_only,01850,3億以下急升異動 [當日第1次] 美好生活集团控股,2,0,SURGE,,2026-06-24 13:48:30,2.0,31.43,daemon_or_definition_difference
+rtss_only,03321,3億以下急升異動 [當日第1次] 中科集团控股,1,0,SURGE,,2026-06-24 10:57:22,1.0,21.55,daemon_or_definition_difference
+rtss_only,08123,3億以下急升異動 [當日第1次] 华亿金控,1,0,SURGE,,2026-06-24 09:36:54,1.0,169.5,daemon_or_definition_difference

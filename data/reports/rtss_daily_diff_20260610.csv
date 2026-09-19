@@ -1,0 +1,4 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,00648,3億以下急升異動 [當日第1次] 京玖康疗(新),4,0,SURGE,,2026-06-10 09:48:49,4.0,80.88,mcap_over_3e8
+rtss_only,01613,3億以下急升異動 [當日第1次] 协同通信,7,0,SURGE,,2026-06-10 09:49:45,7.0,141.29,daemon_or_definition_difference
+rtss_only,06193,3億以下急升異動 [當日第1次] 泰林科建,1,0,SURGE,,2026-06-10 11:45:54,1.0,70.37,daemon_or_definition_difference

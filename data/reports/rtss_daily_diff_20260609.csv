@@ -1,0 +1,4 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,00648,3億以下急升異動 [當日第1次] 京玖康疗(新),1,0,SURGE,,2026-06-09 15:30:40,1.0,20.62,daemon_or_definition_difference
+rtss_only,01825,3億以下急升異動 [當日第1次] STERLING GP,1,0,SURGE,,2026-06-09 15:55:51,1.0,25.56,daemon_or_definition_difference
+rtss_only,01912,3億以下急升異動 [當日第1次] 康特隆,5,0,SURGE,,2026-06-09 09:24:27,5.0,214.29,daemon_or_definition_difference

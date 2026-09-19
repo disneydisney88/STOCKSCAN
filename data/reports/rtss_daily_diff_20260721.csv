@@ -1,0 +1,3 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,01869,3億以下急升異動 [當日第1次] 猫屎咖啡控股,2,0,SURGE,,2026-07-21 13:09:02,2.0,31.58,daemon_or_definition_difference
+rtss_only,02320,3億以下急升異動 [當日第1次] 合丰集团,1,0,SURGE,,2026-07-21 16:03:30,1.0,36.51,daemon_or_definition_difference

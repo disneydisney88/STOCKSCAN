@@ -1,0 +1,6 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,00889,3億以下急升異動 [當日第1次] 连达科技控股,9,0,SURGE,,2026-06-01 09:36:31,9.0,213.95,mcap_over_3e8
+rtss_only,01796,3億以下急升異動 [當日第1次] 中国数智科技,2,0,SURGE,,2026-06-01 10:35:10,2.0,40.26,daemon_or_definition_difference
+rtss_only,01991,3億以下急升異動 [當日第1次] 大洋集团,1,0,SURGE,,2026-06-01 09:36:58,1.0,25.86,daemon_or_definition_difference
+rtss_only,02951,急跌監察警報！ 京玖康疗,1,0,UNKNOWN,,2026-06-01 09:33:06,,,mcap_over_3e8
+rtss_only,08556,急跌監察警報！ NIUHOLDINGS RTS,1,0,UNKNOWN,,2026-06-01 09:33:38,,,turnover_below_500k

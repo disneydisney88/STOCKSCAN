@@ -1,0 +1,11 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,00118,3億以下急升異動 [當日第1次] 大同机械,3,0,SURGE,,2026-05-07 15:02:21,3.0,85.71,mcap_over_3e8
+rtss_only,00309,3億以下急升異動 [當日第1次] 新华通讯频媒,1,0,SURGE,,2026-05-07 09:37:31,1.0,84.37,daemon_or_definition_difference
+rtss_only,01087,3億以下急升異動 [當日第1次] 威讯控股,1,0,SURGE,,2026-05-07 14:35:50,1.0,41.1,daemon_or_definition_difference
+rtss_only,01682,3億以下急升異動 [當日第1次] 杭品生活科技,1,0,SURGE,,2026-05-07 14:10:14,1.0,22.41,daemon_or_definition_difference
+rtss_only,01808,3億以下急升異動 [當日第1次] 企展控股,1,0,SURGE,,2026-05-07 13:16:27,1.0,35.56,daemon_or_definition_difference
+rtss_only,02370,3億以下急升異動 [當日第1次] 力高健康生活,1,0,SURGE,,2026-05-07 13:23:27,1.0,20.22,daemon_or_definition_difference
+rtss_only,03919,3億以下急升異動 [當日第1次] 金力集团,5,0,SURGE,,2026-05-07 09:59:05,5.0,116.43,daemon_or_definition_difference
+rtss_only,08490,3億以下急升異動 [當日第1次] 骏码半导体,1,0,SURGE,,2026-05-07 13:23:51,1.0,30.87,daemon_or_definition_difference
+rtss_only,08529,3億以下急升異動 [當日第1次] 优博控股,7,0,SURGE,,2026-05-07 11:19:01,7.0,105.88,mcap_over_3e8
+rtss_only,08532,3億以下急升異動 [當日第1次] 宝发控股,1,0,SURGE,,2026-05-07 15:10:10,1.0,29.69,daemon_or_definition_difference

@@ -1,0 +1,12 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,00361,汉成发展控股,4,0,SURGE,,2026-09-17 13:14:52,4.0,65.79,daemon_off;mcap_over_cap
+rtss_only,00379,恒嘉融资租赁,1,0,SURGE,,2026-09-17 14:17:48,1.0,64.47,daemon_off
+rtss_only,01750,全达电器集团控股,1,0,SURGE,,2026-09-17 09:54:40,1.0,43.86,daemon_off
+rtss_only,01825,STERLING GP,1,0,PLUNGE,,2026-09-17 09:38:11,,-72.57,daemon_off;plunge_not_tracked
+rtss_only,01871,向中国际,1,0,SURGE,,2026-09-17 15:01:47,1.0,31.15,daemon_off
+rtss_only,02048,易居企业控股,1,0,SURGE,,2026-09-17 11:27:34,1.0,25.0,daemon_off
+rtss_only,02738,华津国际控股,1,0,SURGE,,2026-09-17 09:42:37,1.0,32.95,daemon_off
+rtss_only,02928,港仔机器人股权,1,0,PLUNGE,,2026-09-17 10:05:27,,-74.29,daemon_off;plunge_not_tracked;below_threshold
+rtss_only,03708,世界数字经济产业,1,0,SURGE,,2026-09-17 16:05:24,1.0,40.48,daemon_off
+rtss_only,08483,名仕快相,2,0,SURGE,,2026-09-17 13:09:24,2.0,34.15,daemon_off
+rtss_only,08547,PACIFIC LEGEND,1,0,SURGE,,2026-09-17 14:00:09,1.0,20.29,daemon_off

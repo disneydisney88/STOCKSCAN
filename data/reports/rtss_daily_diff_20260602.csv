@@ -1,0 +1,7 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,00989,3億以下急升異動 [當日第1次] 中国长白山国际,2,0,SURGE,,2026-06-02 14:18:31,2.0,45.0,mcap_over_3e8
+rtss_only,01679,3億以下急升異動 [當日第1次] 瑞斯康集团,3,0,SURGE,,2026-06-02 14:25:03,3.0,45.83,mcap_over_3e8
+rtss_only,02956,3億以下急升異動 [當日第1次] 中国健康科技股权,3,0,SURGE,,2026-06-02 14:18:58,3.0,233.33,daemon_or_definition_difference
+rtss_only,02960,急跌監察警報！ ALCO HOLD RTS,1,0,UNKNOWN,,2026-06-02 09:33:11,,,turnover_below_500k
+rtss_only,08031,3億以下急升異動 [當日第1次] 易通讯集团,2,0,SURGE,,2026-06-02 09:37:03,2.0,87.1,daemon_or_definition_difference
+rtss_only,08560,急跌監察警報！ 麦迪森控股股权,1,0,UNKNOWN,,2026-06-02 09:38:48,,,turnover_below_500k

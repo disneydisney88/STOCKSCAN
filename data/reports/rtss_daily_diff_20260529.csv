@@ -1,0 +1,5 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,01472,3億以下急升異動 [當日第1次] 生兴控股,2,0,SURGE,,2026-05-29 13:30:42,2.0,35.85,daemon_or_definition_difference
+rtss_only,02310,3億以下急升異動 [當日第1次] 时代环球集团,1,0,SURGE,,2026-05-29 11:48:34,1.0,75.44,daemon_or_definition_difference
+rtss_only,06128,3億以下急升異動 [當日第1次] 烯石电车新材料,1,0,SURGE,,2026-05-29 13:12:31,1.0,21.43,daemon_or_definition_difference
+rtss_only,08070,3億以下急升異動 [當日第1次] 侨洋国际控股,3,0,SURGE,,2026-05-29 10:02:17,3.0,45.45,mcap_over_3e8

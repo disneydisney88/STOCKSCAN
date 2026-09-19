@@ -1,0 +1,5 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,00532,3億以下急升異動 [當日第1次] WKK INTL (HOLD),3,0,SURGE,,2026-04-28 13:36:27,3.0,54.9,daemon_or_definition_difference
+rtss_only,01912,3億以下急升異動 [當日第1次] 康特隆,1,0,SURGE,,2026-04-28 14:01:47,1.0,42.86,daemon_or_definition_difference
+rtss_only,06988,3億以下急升異動 [當日第1次] 乐享集团,1,0,SURGE,,2026-04-28 10:09:57,1.0,20.0,daemon_or_definition_difference
+rtss_only,08249,急跌監察警報！ 瑞远智控,1,0,UNKNOWN,,2026-04-28 10:28:57,,,turnover_below_500k

@@ -1,0 +1,6 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,01850,3億以下急升異動 [當日第1次] 美好生活集团控股,2,0,SURGE,,2026-08-10 11:35:41,2.0,36.26,daemon_or_definition_difference
+rtss_only,02017,3億以下急升異動 [當日第1次] 沧海控股,2,0,SURGE,,2026-08-10 11:02:49,2.0,40.0,daemon_or_definition_difference
+rtss_only,02048,3億以下急升異動 [當日第1次] 易居企业控股,1,0,SURGE,,2026-08-10 13:24:04,1.0,78.95,daemon_or_definition_difference
+rtss_only,03301,3億以下急升異動 [當日第1次] 融信中国,1,0,SURGE,,2026-08-10 09:54:54,1.0,21.57,daemon_or_definition_difference
+rtss_only,08529,3億以下急升異動 [當日第1次] 优博控股,2,0,SURGE,,2026-08-10 10:07:21,2.0,33.33,daemon_or_definition_difference

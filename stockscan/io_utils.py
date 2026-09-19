@@ -15,6 +15,19 @@ from config import DATA_DIR, EOD_DIR, INTRADAY_DIR, LOGS_DIR, ROOT, STATE_DIR, T
 HKT = ZoneInfo(TZ)
 
 
+def get_secret(key: str) -> str:
+    """讀單一憑證：環境變數 → st.secrets（Streamlit Cloud）。值唔准 print。"""
+    v = os.environ.get(key, "").strip()
+    if v:
+        return v
+    try:
+        import streamlit as st
+
+        return str(st.secrets.get(key, "") or "").strip()
+    except Exception:
+        return ""
+
+
 def load_secrets_env() -> list[str]:
     """P6b 統一憑證：載入 repo `_secrets/.env`（Drive 同步、gitignored，唔准 push）
     同 `%USERPROFILE%\\.stockscan\\.env`。用 setdefault——已設環境變數一定贏。

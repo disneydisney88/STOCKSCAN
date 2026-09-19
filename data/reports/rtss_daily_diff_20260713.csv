@@ -1,0 +1,5 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,00139,3億以下急升異動 [當日第1次] 小鱼盈通,4,0,SURGE,,2026-07-13 09:35:55,4.0,57.89,daemon_or_definition_difference
+rtss_only,00254,3億以下急升異動 [當日第1次] 国家联合资源,1,0,SURGE,,2026-07-13 16:03:40,1.0,22.05,daemon_or_definition_difference
+rtss_only,01452,3億以下急升異動 [當日第1次] 迪诺斯环保,1,0,SURGE,,2026-07-13 11:02:29,1.0,31.1,daemon_or_definition_difference
+rtss_only,01870,3億以下急升異動 [當日第1次] 益美国际控股,1,0,SURGE,,2026-07-13 13:02:56,1.0,20.96,daemon_or_definition_difference

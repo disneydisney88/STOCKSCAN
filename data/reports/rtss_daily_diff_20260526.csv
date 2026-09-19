@@ -1,0 +1,3 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,00243,3億以下急升異動 [當日第1次] QPL INT'L,2,0,SURGE,,2026-05-26 10:01:45,2.0,49.09,daemon_or_definition_difference
+rtss_only,08490,3億以下急升異動 [當日第1次] 骏码半导体,3,0,SURGE,,2026-05-26 09:56:07,3.0,67.57,daemon_or_definition_difference

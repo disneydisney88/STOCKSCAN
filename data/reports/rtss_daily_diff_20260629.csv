@@ -1,0 +1,6 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,00653,3億以下急升異動 [當日第1次] 卓悦控股,1,0,SURGE,,2026-06-29 13:51:41,1.0,21.43,daemon_or_definition_difference
+rtss_only,01087,3億以下急升異動 [當日第1次] 威讯控股,3,0,SURGE,,2026-06-29 13:11:46,3.0,55.34,mcap_over_3e8
+rtss_only,01592,3億以下急升異動 [當日第1次] 基石控股,1,0,SURGE,,2026-06-29 13:18:28,1.0,21.29,daemon_or_definition_difference
+rtss_only,08305,3億以下急升異動 [當日第1次] 圣唐控股,1,0,SURGE,,2026-06-29 15:47:52,1.0,27.27,daemon_or_definition_difference
+rtss_only,08406,3億以下急升異動 [當日第1次] 中国口腔产业,1,0,SURGE,,2026-06-29 11:16:59,1.0,20.0,daemon_or_definition_difference

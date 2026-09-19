@@ -1,0 +1,5 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,00254,急跌監察警報！ 国家联合资源,1,0,UNKNOWN,,2026-06-25 10:22:16,,,daemon_or_definition_difference
+rtss_only,01661,3億以下急升異動 [當日第1次] 中国前沿科技集团,3,0,SURGE,,2026-06-25 14:24:15,3.0,55.04,mcap_over_3e8
+rtss_only,02964,急跌監察警報！ 新明中国股权,1,0,UNKNOWN,,2026-06-25 15:56:47,,,turnover_below_500k
+rtss_only,08568,急跌監察警報！ WT集团股权,1,0,UNKNOWN,,2026-06-25 09:33:05,,,turnover_below_500k

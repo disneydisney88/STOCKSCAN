@@ -1,0 +1,5 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,00348,3億以下急升異動 [當日第1次] 中国智能健康,2,0,SURGE,,2026-08-06 12:06:57,2.0,133.33,daemon_or_definition_difference
+rtss_only,01421,3億以下急升異動 [當日第1次] 恒昌集团国际,2,0,SURGE,,2026-08-06 12:07:44,2.0,44.55,daemon_or_definition_difference
+rtss_only,01451,3億以下急升異動 [當日第1次] 万成集团股份,1,0,SURGE,,2026-08-06 15:16:40,1.0,20.5,daemon_or_definition_difference
+rtss_only,01939,3億以下急升異動 [當日第1次] 上善黄金,1,0,SURGE,,2026-08-06 12:07:53,1.0,40.54,daemon_or_definition_difference

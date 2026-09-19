@@ -1,0 +1,6 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,00162,3億以下急升異動 [當日第1次] 世纪金花,2,0,SURGE,,2026-05-22 10:01:21,2.0,130.23,daemon_or_definition_difference
+rtss_only,00524,3億以下急升異動 [當日第1次] 长城天下,2,0,SURGE,,2026-05-22 10:01:32,2.0,43.42,daemon_or_definition_difference
+rtss_only,01796,3億以下急升異動 [當日第2次(29%→45%)] 中国数智科技,3,0,SURGE,,2026-05-22 10:51:30,4.0,65.79,mcap_over_3e8
+rtss_only,02129,3億以下急升異動 [當日第1次] LEGION CONSO,2,0,SURGE,,2026-05-22 11:35:05,2.0,33.55,daemon_or_definition_difference
+rtss_only,08480,3億以下急升異動 [當日第1次] 飞霓控股,1,0,SURGE,,2026-05-22 15:57:46,1.0,30.43,daemon_or_definition_difference

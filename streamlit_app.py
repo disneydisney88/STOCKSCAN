@@ -499,7 +499,32 @@ with tab10:
                              hide_index=True)
 
 with tab11:
-    st.caption("GO/供股預示器只展示事前特徵與歷史關聯；不構成投資建議。小樣本會標記 insufficient_sample。")
+    # 顯示層中文化（數據檔保持英文機讀）
+    FEATURE_ZH = {
+        "mcap": "市值", "turnover_to_mcap": "成交額／市值", "ratio": "成交倍數",
+        "prior_go_365d": "一年內曾有GO", "prior_change_of_control": "曾控制權變更",
+        "prior_placing_180d": "180日內曾配股", "prior_rights_180d": "180日內曾供股",
+        "prior_consolidation_180d": "180日內曾合股", "has_broker_shot": "券商射倉",
+        "appearance_seq": "上榜次數", "recurrence": "反覆上榜", "board": "板塊",
+        "ccass_top10_pct": "CCASS Top10%", "concentration_rising": "集中度變化",
+        "dump_top10_pct_of_issued": "Top10%（股本口徑）", "dump_concentration_rising": "集中度升跌",
+        "dump_top10_x_appearance": "集中度×上榜次數", "dump_top10_x_mcap": "集中度×市值",
+    }
+    OUTCOME_ZH = {"led_to_go_180d": "180日內GO", "led_to_perform": "60日正回報",
+                  "led_to_rights_180d": "180日內供股"}
+    PRED_COL_ZH = {"feature": "特徵", "group": "分組", "n": "樣本數", "outcome": "結果",
+                   "go_rate": "發生率", "baseline": "基準率", "lift": "Lift（倍）",
+                   "sample_note": "樣本註記"}
+
+    def zh_pred(df: pd.DataFrame) -> pd.DataFrame:
+        d = df.copy()
+        if "feature" in d:
+            d["feature"] = d["feature"].map(lambda x: FEATURE_ZH.get(x, x))
+        if "outcome" in d:
+            d["outcome"] = d["outcome"].map(lambda x: OUTCOME_ZH.get(x, x))
+        return d.rename(columns=PRED_COL_ZH)
+
+    st.caption("GO/供股預示器只展示事前特徵與歷史關聯；不構成投資建議。小樣本會標記「樣本不足」。")
     gp = read_csv_if_exists(DATA_DIR / "reports" / "go_predictors.csv")
     rp = read_csv_if_exists(DATA_DIR / "reports" / "rights_predictors.csv")
     gf = read_csv_if_exists(DATA_DIR / "reports" / "go_features.csv")
@@ -508,13 +533,16 @@ with tab11:
     else:
         left, right = st.columns(2)
         with left:
-            st.subheader("GO predictors")
-            st.dataframe(gp, use_container_width=True, hide_index=True)
+            st.subheader("🧭 GO（全購）預示器")
+            st.dataframe(zh_pred(gp), use_container_width=True, hide_index=True)
         with right:
-            st.subheader("Rights predictors")
-            st.dataframe(rp, use_container_width=True, hide_index=True)
-        st.subheader("事前篩選（flag-only）")
-        feature = st.selectbox("特徵", [c for c in FEATURES if c in gf.columns] if "FEATURES" in globals() else ["appearance_seq", "recurrence", "prior_go_365d"])
+            st.subheader("📈 供股預示器")
+            st.dataframe(zh_pred(rp), use_container_width=True, hide_index=True)
+        st.subheader("事前篩選（只列旗標）")
+        feature = st.selectbox(
+            "特徵", [c for c in FEATURES if c in gf.columns] if "FEATURES" in globals()
+            else ["appearance_seq", "recurrence", "prior_go_365d"],
+            format_func=lambda c: FEATURE_ZH.get(c, c))
         if feature in gf.columns:
             vals = sorted(gf[feature].dropna().astype(str).unique())
             chosen = st.multiselect("值", vals, default=vals[:1])
@@ -536,6 +564,7 @@ with tab12:
     row12 = feat12[feat12["code5"] == code12] if not feat12.empty else pd.DataFrame()
 
     from stockscan.ccass_turso import concentration_series, fetch_stock_payloads
+    payloads = {}  # Turso 讀唔到（例如 Cloud 未設定 secrets）都要定義，唔好 NameError
     try:
         payloads = fetch_stock_payloads([code12])
         series = concentration_series(payloads.get(code12) or [])

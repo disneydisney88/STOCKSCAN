@@ -1,0 +1,4 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,01340,3億以下急升異動 [當日第1次] 惠生国际,1,0,SURGE,,2026-05-20 15:50:18,1.0,29.41,daemon_or_definition_difference
+rtss_only,08120,3億以下急升異動 [當日第1次] 国农金融投资,3,0,SURGE,,2026-05-20 14:40:38,3.0,59.09,daemon_or_definition_difference
+rtss_only,08187,3億以下急升異動 [當日第1次] 积木集团,1,0,SURGE,,2026-05-20 15:37:23,1.0,21.57,daemon_or_definition_difference

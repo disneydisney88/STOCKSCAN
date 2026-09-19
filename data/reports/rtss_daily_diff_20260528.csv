@@ -1,0 +1,6 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,01259,3億以下急升異動 [當日第1次] 未来发展控股,2,0,SURGE,,2026-05-28 09:38:57,2.0,47.06,daemon_or_definition_difference
+rtss_only,01667,急跌監察警報！ 迪米生活控股,1,0,UNKNOWN,,2026-05-28 10:02:40,,,turnover_below_500k
+rtss_only,01679,3億以下急升異動 [當日第1次] 瑞斯康集团,1,0,SURGE,,2026-05-28 09:39:08,1.0,101.92,daemon_or_definition_difference
+rtss_only,02028,3億以下急升異動 [當日第1次] 映美控股,8,0,SURGE,,2026-05-28 10:12:31,8.0,151.32,daemon_or_definition_difference
+rtss_only,02956,急跌監察警報！ 中国健康科技股权,1,0,UNKNOWN,,2026-05-28 11:35:55,,,turnover_below_500k

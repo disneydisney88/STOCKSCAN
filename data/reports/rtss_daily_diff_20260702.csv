@@ -1,0 +1,4 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,00139,3億以下急升異動 [當日第1次] 小鱼盈通,1,0,SURGE,,2026-07-02 13:10:58,1.0,25.71,daemon_or_definition_difference
+rtss_only,01894,3億以下急升異動 [當日第1次] 恒益控股,2,0,SURGE,,2026-07-02 14:41:42,2.0,31.58,daemon_or_definition_difference
+rtss_only,01912,3億以下急升異動 [當日第1次] 康特隆,1,0,SURGE,,2026-07-02 11:22:36,1.0,20.0,daemon_or_definition_difference

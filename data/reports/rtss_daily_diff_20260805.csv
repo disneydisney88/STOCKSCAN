@@ -1,0 +1,7 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,01637,3億以下急升異動 [當日第1次] 顺兴集团控股,1,0,SURGE,,2026-08-05 14:42:35,1.0,20.0,daemon_or_definition_difference
+rtss_only,01703,急跌監察警報！ 谊和股份,1,0,UNKNOWN,,2026-08-05 10:48:44,,,daemon_or_definition_difference
+rtss_only,01825,3億以下急升異動 [當日第1次] STERLING GP,3,0,SURGE,,2026-08-05 13:21:15,3.0,74.83,daemon_or_definition_difference
+rtss_only,02286,3億以下急升異動 [當日第1次] 辰兴发展,1,0,SURGE,,2026-08-05 14:11:42,1.0,357.55,daemon_or_definition_difference
+rtss_only,03301,3億以下急升異動 [當日第1次] 融信中国,7,0,SURGE,,2026-08-05 10:13:34,7.0,141.1,daemon_or_definition_difference
+rtss_only,09608,3億以下急升異動 [當日第1次] 宋都服务,1,0,SURGE,,2026-08-05 14:43:02,1.0,71.43,daemon_or_definition_difference

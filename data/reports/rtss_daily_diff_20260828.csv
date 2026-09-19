@@ -1,0 +1,4 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,00389,3億以下急升異動 [當日第1次] 通天酒业,1,0,SURGE,,2026-08-28 10:43:53,1.0,20.0,daemon_or_definition_difference
+rtss_only,02048,3億以下急升異動 [當日第1次] 易居企业控股,2,0,SURGE,,2026-08-28 10:31:38,2.0,84.21,daemon_or_definition_difference
+rtss_only,08578,急跌監察警報！ 国恩控股股权,1,0,UNKNOWN,,2026-08-28 09:32:50,,,turnover_below_500k

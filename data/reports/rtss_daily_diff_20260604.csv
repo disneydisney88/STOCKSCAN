@@ -1,0 +1,8 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,00648,3億以下急升異動 [當日第1次] 京玖康疗(新),2,0,SURGE,,2026-06-04 10:38:36,2.0,34.31,daemon_or_definition_difference
+rtss_only,01540,3億以下急升異動 [當日第1次] 澳狮环球,2,0,SURGE,,2026-06-04 10:14:01,2.0,41.46,daemon_or_definition_difference
+rtss_only,02459,3億以下急升異動 [當日第1次] 升能集团(新),1,0,SURGE,,2026-06-04 15:06:06,1.0,29.9,daemon_or_definition_difference
+rtss_only,02951,3億以下急升異動 [當日第1次] 京玖康疗(旧),2,0,SURGE,,2026-06-04 13:10:32,2.0,31.16,daemon_or_definition_difference
+rtss_only,08426,3億以下急升異動 [當日第1次] 雅居投资控股,1,0,SURGE,,2026-06-04 10:33:02,1.0,48.0,daemon_or_definition_difference
+rtss_only,08480,3億以下急升異動 [當日第1次] 飞霓控股,1,0,SURGE,,2026-06-04 11:28:56,1.0,33.03,daemon_or_definition_difference
+rtss_only,09978,3億以下急升異動 [當日第1次] 方圆生活服务,4,0,SURGE,,2026-06-04 09:55:59,4.0,140.62,daemon_or_definition_difference

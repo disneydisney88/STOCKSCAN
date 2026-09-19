@@ -1,0 +1,6 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,01894,3億以下急升異動 [當日第1次] 恒益控股,1,0,SURGE,,2026-05-15 13:19:18,1.0,20.59,daemon_or_definition_difference
+rtss_only,06968,3億以下急升異動 [當日第1次] 港龙中国地产,1,0,SURGE,,2026-05-15 10:08:44,1.0,21.74,daemon_or_definition_difference
+rtss_only,08471,3億以下急升異動 [當日第1次] 新达控股,1,0,SURGE,,2026-05-15 09:56:29,1.0,84.09,daemon_or_definition_difference
+rtss_only,08529,3億以下急升異動 [當日第1次] 优博控股,1,0,SURGE,,2026-05-15 11:36:45,1.0,30.95,daemon_or_definition_difference
+rtss_only,08549,3億以下急升異動 [當日第1次] 金叶国际集团,1,0,SURGE,,2026-05-15 15:37:57,1.0,28.32,daemon_or_definition_difference

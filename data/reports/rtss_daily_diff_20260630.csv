@@ -1,0 +1,5 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,00139,3億以下急升異動 [當日第1次] 小鱼盈通,1,0,SURGE,,2026-06-30 15:38:07,1.0,21.24,daemon_or_definition_difference
+rtss_only,01966,3億以下急升異動 [當日第1次] 中骏集团控股,1,0,SURGE,,2026-06-30 13:22:10,1.0,36.96,daemon_or_definition_difference
+rtss_only,03774,急跌監察警報！ 亮晴控股,1,0,UNKNOWN,,2026-06-30 09:22:04,,,mcap_over_3e8;turnover_below_500k
+rtss_only,08547,3億以下急升異動 [當日第1次] PACIFIC LEGEND,1,0,SURGE,,2026-06-30 15:13:54,1.0,23.46,daemon_or_definition_difference

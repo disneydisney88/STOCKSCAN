@@ -1,0 +1,6 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,01196,急跌監察警報！ 伟禄科技股份,1,0,UNKNOWN,,2026-07-30 11:37:06,,,mcap_over_3e8
+rtss_only,01500,3億以下急升異動 [當日第1次] 现恒建筑,3,0,SURGE,,2026-07-30 11:21:57,3.0,67.36,mcap_over_3e8
+rtss_only,01703,3億以下急升異動 [當日第1次] 谊和股份,5,0,SURGE,,2026-07-30 11:22:03,5.0,83.67,daemon_or_definition_difference
+rtss_only,01869,3億以下急升異動 [當日第1次] 猫屎咖啡控股,2,0,SURGE,,2026-07-30 15:01:22,2.0,44.0,daemon_or_definition_difference
+rtss_only,08221,3億以下急升異動 [當日第1次] 高裕金融,1,0,SURGE,,2026-07-30 13:53:26,1.0,25.69,daemon_or_definition_difference

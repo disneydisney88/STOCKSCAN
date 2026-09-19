@@ -1,0 +1,6 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,00381,3億以下急升異動 [當日第1次] 权识国际,1,0,SURGE,,2026-04-24 13:50:22,1.0,24.46,daemon_or_definition_difference
+rtss_only,00499,3億以下急升異動 [當日第1次] 青岛控股,1,0,SURGE,,2026-04-24 14:39:56,1.0,105.65,daemon_or_definition_difference
+rtss_only,00911,3億以下急升異動 [當日第1次] 前海健康,3,0,SURGE,,2026-04-24 11:52:51,3.0,44.07,daemon_or_definition_difference
+rtss_only,01087,3億以下急升異動 [當日第1次] 威讯控股,1,0,SURGE,,2026-04-24 14:15:33,1.0,20.78,daemon_or_definition_difference
+rtss_only,02940,急跌監察警報！ 经纬天地,1,0,UNKNOWN,,2026-04-24 10:32:46,,,mcap_over_3e8

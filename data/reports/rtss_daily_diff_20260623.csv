@@ -1,0 +1,6 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,01613,3億以下急升異動 [當日第1次] 协同通信,1,0,SURGE,,2026-06-23 11:56:15,1.0,26.39,daemon_or_definition_difference
+rtss_only,01752,3億以下急升異動 [當日第1次] 澳洲成峰高教,3,0,SURGE,,2026-06-23 09:36:36,3.0,105.43,mcap_over_3e8
+rtss_only,01850,3億以下急升異動 [當日第1次] 美好生活集团控股,2,0,SURGE,,2026-06-23 10:03:30,2.0,32.86,daemon_or_definition_difference
+rtss_only,02617,急跌監察警報！ 药捷安康-B,1,0,UNKNOWN,,2026-06-23 09:38:38,,,mcap_over_3e8
+rtss_only,08547,3億以下急升異動 [當日第1次] PACIFIC LEGEND,1,0,SURGE,,2026-06-23 11:50:34,1.0,20.55,daemon_or_definition_difference

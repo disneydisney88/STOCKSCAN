@@ -1,0 +1,6 @@
+﻿group,code5,name,rtss_count,stockscan_count,rtss_types,stockscan_types,rtss_first_ts,rtss_max_count_today,rtss_max_chg_pct,possible_reason
+rtss_only,00875,3億以下急升異動 [當日第1次] 从玉智农,2,0,SURGE,,2026-08-18 09:36:13,2.0,37.29,daemon_or_definition_difference
+rtss_only,01176,3億以下急升異動 [當日第1次] 珠光控股,1,0,SURGE,,2026-08-18 15:40:25,1.0,46.67,daemon_or_definition_difference
+rtss_only,01527,3億以下急升異動 [當日第1次] 天洁环境,1,0,SURGE,,2026-08-18 15:22:11,1.0,23.33,mcap_over_3e8
+rtss_only,06158,3億以下急升異動 [當日第1次] 正荣地产,4,0,SURGE,,2026-08-18 09:49:49,4.0,125.0,daemon_or_definition_difference
+rtss_only,08125,3億以下急升異動 [當日第1次] 荣记万通,1,0,SURGE,,2026-08-18 16:05:47,1.0,30.3,daemon_or_definition_difference
