@@ -36,3 +36,6 @@ tracking/
 
 # 統一憑證（Longbridge+Turso+CCASS）——Drive 同步但唔准 push
 _secrets/
+
+# 大數據產物慣例位（dump、extract 產物）——Drive 同步、gitignored，唔好放 Downloads（09-19 事故）
+_data/

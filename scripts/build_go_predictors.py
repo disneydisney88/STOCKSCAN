@@ -23,6 +23,8 @@ FEATURES = [
     "ccass_top10_pct", "concentration_rising",
     # Webb dump dailylog（of-issued 口徑，2025-04→12 覆蓋面板前半）
     "dump_top10_pct_of_issued", "dump_concentration_rising",
+    # P6c 交叉分組（⑤）
+    "dump_top10_x_appearance", "dump_top10_x_mcap",
 ]
 
 PANEL = ROOT / "data" / "eod" / "radar_eod_panel_full.csv"
@@ -65,6 +67,19 @@ def _asof_features(df: pd.DataFrame) -> pd.DataFrame:
               "dump_top10_pct_of_issued", "dump_concentration_rising"):
         if c not in d:
             d[c] = np.nan
+
+    # P6c 交叉分組（⑤）：集中度 bin × 上榜次數／市值。n≥20 紀律照跟。
+    pct_bin = _groups(d.get("dump_top10_pct_of_issued", pd.Series(index=d.index, dtype="float64")),
+                      "dump_top10_pct_of_issued")
+    app_bin = _groups(d.get("appearance_seq", pd.Series(index=d.index, dtype="float64")),
+                      "appearance_seq")
+    mcap_bin = _groups(d.get("mcap", pd.Series(index=d.index, dtype="float64")), "mcap")
+    d["dump_top10_x_appearance"] = [
+        f"{a}×{b}" if a != "unknown" and b != "unknown" else "unknown"
+        for a, b in zip(pct_bin, app_bin)]
+    d["dump_top10_x_mcap"] = [
+        f"{a}×{b}" if a != "unknown" and b != "unknown" else "unknown"
+        for a, b in zip(pct_bin, mcap_bin)]
     # Absent upstream feeds remain explicitly null rather than being guessed.
     for c in ("mcap", "turnover_to_mcap", "ratio", "board"):
         if c not in d:

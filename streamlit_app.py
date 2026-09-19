@@ -75,9 +75,10 @@ def data_asof(df: pd.DataFrame) -> str:
     return str(df["scan_time"].dropna().max())[:16]
 
 
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11 = st.tabs(
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11, tab12 = st.tabs(
     ["📊 收市爆量榜（訊號A）", "⚡ 即市掃描（訊號B）", "🔬 對照 RTSS", "🗂 歷史面板", "📈 事件率",
-     "🔎 個股研究", "9️⃣ RTSS 對照", "🐤 春江鴨", "🧩 L 型候選", "📕 追蹤簿", "1️⃣1️⃣ GO 預示器"])
+     "🔎 個股研究", "9️⃣ RTSS 對照", "🐤 春江鴨", "🧩 L 型候選", "📕 追蹤簿", "🧭 GO 預示器",
+     "🧮 集中度歷史"])
 
 with tab1:
     files = [f for f in eod_files() if f.name not in {"radar_eod_panel.csv", "radar_eod_panel_full.csv"}]
@@ -459,31 +460,6 @@ with tab10:
                       f"n={n.get('all', 0)}（非_est）")
             st.caption("中位數只計 ret_t20 非 _est 行；_est 行數見 tracking_summary.csv n_est 欄。")
 
-with tab11:
-    st.caption("GO/供股預示器只展示事前特徵與歷史關聯；不構成投資建議。小樣本會標記 insufficient_sample。")
-    gp = read_csv_if_exists(DATA_DIR / "reports" / "go_predictors.csv")
-    rp = read_csv_if_exists(DATA_DIR / "reports" / "rights_predictors.csv")
-    gf = read_csv_if_exists(DATA_DIR / "reports" / "go_features.csv")
-    if gp.empty or gf.empty:
-        st.info("未有 GO 報表。先跑：`python scripts/build_go_predictors.py`")
-    else:
-        left, right = st.columns(2)
-        with left:
-            st.subheader("GO predictors")
-            st.dataframe(gp, use_container_width=True, hide_index=True)
-        with right:
-            st.subheader("Rights predictors")
-            st.dataframe(rp, use_container_width=True, hide_index=True)
-        st.subheader("事前篩選（flag-only）")
-        feature = st.selectbox("特徵", [c for c in FEATURES if c in gf.columns] if "FEATURES" in globals() else ["appearance_seq", "recurrence", "prior_go_365d"])
-        if feature in gf.columns:
-            vals = sorted(gf[feature].dropna().astype(str).unique())
-            chosen = st.multiselect("值", vals, default=vals[:1])
-            current = gf[gf["scan_date"] == gf["scan_date"].max()] if "scan_date" in gf else gf
-            if chosen:
-                current = current[current[feature].astype(str).isin(chosen)]
-            st.dataframe(current, use_container_width=True, hide_index=True)
-
         st.subheader(f"明細（{len(show)} 行）")
         st.dataframe(show, use_container_width=True, height=520, hide_index=True)
 
@@ -521,6 +497,120 @@ with tab11:
             with st.expander(f"📄 {qcsv.name}"):
                 st.dataframe(read_csv_if_exists(qcsv), use_container_width=True, height=300,
                              hide_index=True)
+
+with tab11:
+    st.caption("GO/供股預示器只展示事前特徵與歷史關聯；不構成投資建議。小樣本會標記 insufficient_sample。")
+    gp = read_csv_if_exists(DATA_DIR / "reports" / "go_predictors.csv")
+    rp = read_csv_if_exists(DATA_DIR / "reports" / "rights_predictors.csv")
+    gf = read_csv_if_exists(DATA_DIR / "reports" / "go_features.csv")
+    if gp.empty or gf.empty:
+        st.info("未有 GO 報表。先跑：`python scripts/build_go_predictors.py`")
+    else:
+        left, right = st.columns(2)
+        with left:
+            st.subheader("GO predictors")
+            st.dataframe(gp, use_container_width=True, hide_index=True)
+        with right:
+            st.subheader("Rights predictors")
+            st.dataframe(rp, use_container_width=True, hide_index=True)
+        st.subheader("事前篩選（flag-only）")
+        feature = st.selectbox("特徵", [c for c in FEATURES if c in gf.columns] if "FEATURES" in globals() else ["appearance_seq", "recurrence", "prior_go_365d"])
+        if feature in gf.columns:
+            vals = sorted(gf[feature].dropna().astype(str).unique())
+            chosen = st.multiselect("值", vals, default=vals[:1])
+            current = gf[gf["scan_date"] == gf["scan_date"].max()] if "scan_date" in gf else gf
+            if chosen:
+                current = current[current[feature].astype(str).isin(chosen)]
+            st.dataframe(current, use_container_width=True, hide_index=True)
+
+with tab12:
+    # ── P6c 集中度歷史：三源合併（dump of-issued / Turso cache 近窗 / holdings_daily）
+    # ＋ adjusted_concentration（剔除結算所/非流通塊）──
+    st.caption("逐日 CCASS Top10%：三個源各自標明（Webb dump of-issued＝2025H2 主力、"
+               "warm cache 近 15 個結算日、holdings_daily of-CCASS 僅參考）。"
+               "CCASS 為 T-2 結算日數據；只列數字，不構成投資建議。")
+    code12 = st.text_input("股票代號（5 位）", value="01825", max_chars=5,
+                           key="conc_code").strip().zfill(5)
+
+    feat12 = read_csv_if_exists(DATA_DIR / "reports" / "ccass_concentration_features.csv")
+    row12 = feat12[feat12["code5"] == code12] if not feat12.empty else pd.DataFrame()
+
+    from stockscan.ccass_turso import concentration_series, fetch_stock_payloads
+    try:
+        payloads = fetch_stock_payloads([code12])
+        series = concentration_series(payloads.get(code12) or [])
+    except Exception as e:  # noqa: BLE001——Turso 讀唔到唔好炸成個 tab
+        series = []
+        st.warning(f"Turso 讀取失敗：{e!r}")
+
+    chart_rows = []
+    for r in series:  # warm cache 源（近窗，webb 原始口徑）
+        if r["date"] and r["top10_pct"] not in (None, ""):
+            chart_rows.append({"date": r["date"], "Top10%（warm cache）":
+                               float(r["top10_pct"])})
+    if not row12.empty:
+        for _, r in row12.iterrows():  # dump 源（2025H2，of-issued）
+            if str(r.get("dump_asof_date") or "") and str(r.get("dump_top10_pct_of_issued_raw") or ""):
+                chart_rows.append({"date": str(r["dump_asof_date"]),
+                                   "Top10%（dump of-issued）":
+                                   float(r["dump_top10_pct_of_issued_raw"])})
+        for _, r in row12.iterrows():  # holdings_daily 參考源
+            if str(r.get("hd_asof_date") or "") and str(r.get("hd_top10_pct_of_ccass") or ""):
+                chart_rows.append({"date": str(r["hd_asof_date"]),
+                                   "Top10%（holdings_daily of-CCASS）":
+                                   float(r["hd_top10_pct_of_ccass"])})
+    if chart_rows:
+        cdf = pd.DataFrame(chart_rows).drop_duplicates(["date"], keep="first")
+        for src_col in ("Top10%（warm cache）", "Top10%（dump of-issued）",
+                        "Top10%（holdings_daily of-CCASS）"):
+            if src_col in cdf:
+                cdf[src_col] = pd.to_numeric(cdf[src_col], errors="coerce")
+        cdf = cdf.groupby("date", as_index=True).max().sort_index()
+        st.line_chart(cdf, height=300)
+        st.caption(f"{len(cdf)} 個有數據日子；三條線口徑唔同，唔可以直接互相比。")
+    else:
+        st.info(f"{code12} 暫時三個源都冇集中度紀錄（未 warm／dump 冇呢隻）。")
+
+    if not row12.empty:
+        show_cols = [c for c in ("scan_date", "dump_asof_date", "dump_top10_pct_of_issued",
+                                 "dump_concentration_rising", "dump_corp_action_in_window",
+                                 "ccass_top10_pct", "hd_top10_pct_of_ccass")
+                     if c in row12.columns]
+        st.subheader("追蹤簿上榜日嘅 as-of 值（T-2 交易日對齊）")
+        st.dataframe(row12[show_cols], use_container_width=True, height=280, hide_index=True)
+
+    # 財技事件旗（上榜研究必睇嘅背景）
+    import sqlite3
+    with sqlite3.connect(DATA_DIR / "events.db") as econ:
+        evs = pd.read_sql_query(
+            "SELECT event_type, announce_date, key_date_1, status FROM events "
+            "WHERE code5 = ? AND announce_date >= '2025-01-01' "
+            "ORDER BY announce_date DESC LIMIT 20",
+            econ, params=(code12,))
+    if not evs.empty:
+        st.subheader("財技事件（2025 起）")
+        st.dataframe(evs, use_container_width=True, height=240, hide_index=True)
+
+    # ⑦ adjusted_concentration（剔除結算所／非流通塊）——需要持股明細
+    st.subheader("調整後集中度（adjusted concentration）")
+    holdings_rows = (payloads.get(code12) or {}).get("holdings") or []
+    if holdings_rows:
+        from stockscan.adjusted_concentration import compute_concentration
+        holdings = [{"pid": str(h.get("participant_id") or h.get("ID") or h.get("pid") or ""),
+                     "name": str(h.get("participant_name") or h.get("Name") or ""),
+                     "shares": int(h.get("holding") or h.get("shares") or 0)}
+                    for h in holdings_rows if (h.get("holding") or h.get("shares"))]
+        if holdings:
+            m12 = compute_concentration(holdings)
+            st.caption("剔除規則未設定（exclude_ids 空）＝raw 指標；A 字頭參與者語義要自己核實先填。")
+            st.json({k: m12[k] for k in ("ccass_total_shares", "adj_top5_pct", "adj_top10_pct",
+                                         "adj_hhi", "participant_count", "flags")
+                     if k in m12})
+        else:
+            st.info("有 holdings 明細但解析唔到持股欄位。")
+    else:
+        st.info("warm cache（hybrid_light）冇 Holdings 明細——adjusted 版要等 dump `holdings` 表"
+                "重抽（17GB dump 重新提供後）或 Render holdings 修復。fail-loud 唔拼湊。")
 
 if UNIVERSE_CSV.exists():
     uni = read_csv_if_exists(UNIVERSE_CSV)

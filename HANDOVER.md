@@ -570,3 +570,28 @@ rising 0.98 最差），級別效應遠細過 GO 表。
 2. pending=0 後：`python scripts/build_concentration_features.py` → `python scripts/build_go_predictors.py`
 3. 報表 copy 兩邊交收夾 tracking\；GO 預示器 tab11 自動讀到新 predictor CSV
 *本節只列數字同方法，結論留 KL/Claude。*
+
+## 21. Roadmap 一次過搞（zcode，2026-09-19）
+
+KL 2026-09-19「一次過搞」以下全部；每項獨立 commit。
+
+- **⑩ 節律入 config**：CCASS repo `warm_chunked_v2.py` 嘅 CHUNK/COOL/BAN/MAX_CYCLES 改 env 可調
+  （`WARM_CHUNK`/`WARM_CHUNK_COOL_S`/`WARM_BAN_COOL_S`/`WARM_MAX_CYCLES`），實測值做預設
+- **② 每日增量 warm**：CCASS repo `scripts/warm_incremental.py`——只磨新上榜＋fetched_at 過期
+  （預設 7 日）＋之前失敗嘅；每日一跑 <30 隻，遠低於 mirror 速率規則。建議加落本機排程或 Actions EOD 後
+- **① extractor 重建**：CCASS repo `scripts/extract_webb_dump.py`（原版隨 Downloads 被清）。欄序全部
+  用已驗證值寫死＋runtime 欄數 fail-loud 稽核＋parser 單元自測過。等 2026 版 dump 一到就一條命令重抽
+- **⑤ GO 預示器 v2**：`build_go_predictors.py` 加交叉分組 `dump_top10_x_appearance`（集中度 bin×上榜次數）
+  同 `dump_top10_x_mcap`（×市值），n≥20 紀律照跟
+- **⑥ 反覆上榜×集中度**：`scripts/analyze_recurrence_concentration.py` →
+  `recurrence_concentration_cross.csv`（上榜次數組×集中度 bin×GO/perform 率）
+- **④⑦ tab12「🧮 集中度歷史」**：三源合併逐日 Top10%（dump of-issued／warm cache／holdings_daily，
+  口徑各自標明唔互比）＋上榜日 as-of 值表＋財技事件表＋adjusted_concentration 區
+  （warm cache 冇 Holdings 明細，adjusted 要等 dump `holdings` 重抽或 Render 修復——fail-loud 唔拼湊）
+  **順手修復**：Codex 加 tab11 時誤將 tab10 嘅明細/drill-down/L型 block 搬咗入 tab11，已搬返正
+- **⑧ surveillance skill**：`skills/hk-smallcap-surveillance/SKILL.md`——全套紀律（時區、財技分類、
+  T-2、_est、未知≠零、憑證、環境陷阱、mirror 節律）寫成 skill，之後任何 AI session 自動跟
+- **⑨ _data 慣例**：`G:\...\STOCKSCAN\_data\`（gitignored）——大數據產物一律放呢度，唔好放 Downloads
+- **任務XY**（`claude_ZCODE任務規格書_股本面板與CCASS抽樣_任務XY_20260913.md`）：
+  Y0＋X′ 試點用 Render HTTP API 直打（`/api/stock`＋`/api/stock/capital`，冷啟動退避重試），
+  QA 報告＋產物去 `G:\我的雲端硬碟\RTSS\codex\`；照規格書紅線：試點報告後停，X1′/Y1 全量等 KL 確認
