@@ -607,3 +607,14 @@ KL 2026-09-19「一次過搞」以下全部；每項獨立 commit。
   逐日股數（c10 同股數同日同口徑，合股污染根治）——dump 源暫時欠奉（Downloads 被清），
   feature CSV 用 git `44e0b90` 版本（3,730 行潔淨）；KL 重新提供 2026 版 dump 後，
   `WEBB_DUMP_DAILYLOG` 環境變數指去新 dailylog.csv 即可一鍵重跑
+
+### 研究站 dt_events 入庫（2026-09-19）
+
+KL 提供港股研究站 12 類財技事件（3,013 單，同花順源，`C:\data\HKSTOCKDB\dropin\dt_events\`）。
+`scripts/import_dt_events.py` 已入 events.db：3,560→4,322 行。要點：
+- `cat` 欄係中文（全購/可換股債券/轉主板…），映射表喺 script 頭
+- 新 event_type：PRIVATIZATION 153／BONUS 59／HALFNEW 492（半新股+IPO 係純名單無日期，
+  照 M1 慣例 announce_date 空＋date_parse_failed=1 留底）
+- 六類既有增量 +267 單，去重鍵 (code5, event_type, announce_date)
+- **回購另開 `repurchase_daily` 表 1,000 行**（每日動作唔係事件；1,000 行疑似同花順截斷，未證實）
+- 連帶：`build_concentration_features.py` anchor 已升級用任務 X1 逐日股數
