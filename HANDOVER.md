@@ -595,3 +595,15 @@ KL 2026-09-19「一次過搞」以下全部；每項獨立 commit。
 - **任務XY**（`claude_ZCODE任務規格書_股本面板與CCASS抽樣_任務XY_20260913.md`）：
   Y0＋X′ 試點用 Render HTTP API 直打（`/api/stock`＋`/api/stock/capital`，冷啟動退避重試），
   QA 報告＋產物去 `G:\我的雲端硬碟\RTSS\codex\`；照規格書紅線：試點報告後停，X1′/Y1 全量等 KL 確認
+
+### 任務XY 補充（同日較後）
+
+- **發現：任務XY 已於 2026-09-13 由另一 session 全部完成**（RTSS\codex\MANIFEST.md：
+  X0′ 30/30、Y0 mirror 路線可行、Y1 150 隻抽樣 100% 成功 gap 全 0、X1′ 2,036/2,036 →
+  `share_capital_changes_raw.csv` 45,158 行＋`shares_outstanding_daily.csv` 671,880 行逐日股數）
+- 我嘅 probe 獨立驗證咗規格書三個錨點（01218 拆細 ✓／08059@2018-05-30 ✓／01069 ✓）；
+  payload 正確欄名係 `share_capital_changes`（21 筆對規格書 01218 期望 ✓）
+- **已升級**：`build_concentration_features.py` anchor 改用 `shares_outstanding_daily.csv`
+  逐日股數（c10 同股數同日同口徑，合股污染根治）——dump 源暫時欠奉（Downloads 被清），
+  feature CSV 用 git `44e0b90` 版本（3,730 行潔淨）；KL 重新提供 2026 版 dump 後，
+  `WEBB_DUMP_DAILYLOG` 環境變數指去新 dailylog.csv 即可一鍵重跑
