@@ -556,6 +556,15 @@ led_to_go_180d：top10<20% lift **1.84**（n=442，go_rate 4.98%）／20-40% 1.0
 rising 0.79／flat 1.18／falling 1.04。led_to_perform：各 bin lift 0.84-1.09（<20% 1.09 最好，
 rising 0.98 最差），級別效應遠細過 GO 表。
 
+### PANEL WARM COMPLETE（2026-09-19）
+
+- **1,211/1,212 OK**；唯一 FETCH_FAIL＝00351（SOURCE_CHALLENGE 持續，1.2 秒即斷，屬該股頁壤行為，如實留低）
+- 5 隻重驗全 CACHE HIT：08059/01592/03301/01825/02048（incl. 當年 Render 503 三隻）；01592 集中度紀錄只有 1 行（該股源頭薄）
+- TURSO_WRITE_FAIL 事件：過夜 91 隻寫入失敗係 Turso HTTPS 暫時抖動（`put_api_stock_cache` 吞錯誤只回 False）；重試即復，診斷用 probe/unverified payload 已全數刪除
+- 全程：~24 小時 wall（多個 403 封鎖窗），累計 attempts 內每 OK 平均 17.4 秒
+- **事故**：`Downloads\ccass251227\` 被（zcode 以外嘅）資料夾整理清走——17GB dump、extractor、我個 webb_extract_panel 產物全部唔見。**feature CSV（3,730 行潔淨覆蓋）已存 git `44e0b90`＋兩邊交收夾**；要重跑 dump 源需重新拎 17GB dump（或用研究站個 Streamlit extractor）再抽一次
+- Downloads 夾發現另一份未做規格書：`claude_ZCODE任務規格書_股本面板與CCASS抽樣_任務XY_20260913.md`（待 KL 發落）
+
 ### 晨早 runbook（未完部分）
 1. `python scripts/warm_chunked_v2.py`（idempotent，會 retry 非 OK；現 341/1,226 OK，871 待 retry）
 2. pending=0 後：`python scripts/build_concentration_features.py` → `python scripts/build_go_predictors.py`
