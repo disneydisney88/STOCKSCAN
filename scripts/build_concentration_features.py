@@ -251,6 +251,23 @@ def build(panel_path: Path = PANEL) -> Path:
         rows.append(row)
 
     feat = pd.DataFrame(rows)
+    # dump 源係歷史不變數（2025-04→12-24）：源檔唔在（dump 被清）時，保留舊 CSV 的
+    # dump_* 欄位，唔好每跑一次就洗走 3,730 行歷史（09-20 事故教訓）
+    if not dump_by_code:
+        old_path = REPORTS / "ccass_concentration_features.csv"
+        if old_path.exists():
+            old = pd.read_csv(old_path, dtype={"code5": str}, encoding="utf-8-sig")
+            old_dump_cols = [c for c in old.columns if c.startswith("dump_")]
+            if old_dump_cols:
+                kept = int(old["dump_top10_pct_of_issued"].notna().sum()) \
+                    if "dump_top10_pct_of_issued" in old else 0
+                feat = feat.drop(
+                    columns=[c for c in feat.columns if c.startswith("dump_")],
+                    errors="ignore").merge(
+                    old[["code5", "scan_date"] + old_dump_cols],
+                    on=["code5", "scan_date"], how="left")
+                print(f"[ccass_feat] dump 源缺席：從舊 CSV 保留 {len(old_dump_cols)} 個 "
+                      f"dump_* 欄位（{kept} 行有值）")
     dest = write_csv(feat, REPORTS / "ccass_concentration_features.csv")
     known = int(feat["ccass_top10_pct_known"].sum())
     rising = int((feat["concentration_rising"] == 1).sum())
