@@ -1,0 +1,62 @@
+name: intraday_scan
+
+# 訊號 B：即市急升＋爆量（交易時段每 5 分鐘；非時段 guard 直接 skip）
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "強制掃（繞過交易時段 guard，測試用）"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: intraday_scan
+  cancel-in-progress: true
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      LONGPORT_APP_KEY: ${{ secrets.LONGPORT_APP_KEY }}
+      LONGPORT_APP_SECRET: ${{ secrets.LONGPORT_APP_SECRET }}
+      LONGPORT_ACCESS_TOKEN: ${{ secrets.LONGPORT_ACCESS_TOKEN }}
+      LONGBRIDGE_APP_KEY: ${{ secrets.LONGBRIDGE_APP_KEY }}
+      LONGBRIDGE_APP_SECRET: ${{ secrets.LONGBRIDGE_APP_SECRET }}
+      LONGBRIDGE_ACCESS_TOKEN: ${{ secrets.LONGBRIDGE_ACCESS_TOKEN }}
+      TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE }}
+      TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      - name: HKT trading-hours guard
+        id: guard
+        run: |
+          python - <<'PY'
+          from datetime import datetime, timezone, timedelta
+          import os
+          now = datetime.now(timezone(timedelta(hours=8)))
+          force = "${{ github.event.inputs.force }}" == "true"
+          mins = now.hour * 60 + now.minute
+          in_session = (now.weekday() < 5
+                        and (565 <= mins <= 725 or 775 <= mins <= 975))
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"run={'true' if (in_session or force) else 'false'}\n")
+          print(f"HKT {now:%Y-%m-%d %H:%M} in_session={in_session} force={force}")
+          PY
+
+      - name: Intraday scan
+        if: steps.guard.outputs.run == 'true'
+        run: python scripts/run_intraday.py --once --source cloud
