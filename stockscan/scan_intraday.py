@@ -221,7 +221,9 @@ def scan_once(lb, scan_date: date | None = None) -> tuple[pd.DataFrame, pd.DataF
         if turso_state.configured():
             try:  # A2.1/A2.4：state＋alerts 鏡像上 Turso，本機雲端單一真相
                 turso_state.save(d, state)
-                turso_state.append_alerts(d, alerts.to_dict("records"), source)
+                records = (alerts.to_dict("records") if hasattr(alerts, "to_dict")
+                           else [dict(a) for a in alerts])
+                turso_state.append_alerts(d, records, source)
                 turso_state.touch_heartbeat(source)
             except Exception as e:  # noqa: BLE001
                 log_error("turso.save", repr(e))
