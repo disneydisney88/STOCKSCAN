@@ -44,26 +44,42 @@ def main() -> int:
     lshape_stage = {} if lshape.empty else {
         r["code5"]: r["l_shape_stage"] for _, r in lshape.iterrows()}
 
+    # P6c v2：回購中 ＋ 最新 Top10%（watchlist 產出）
+    wl_path = DATA_DIR / "reports" / "buyback_concentrated_watchlist.csv"
+    wl = pd.read_csv(wl_path, dtype={"code5": str}, encoding="utf-8-sig")         if wl_path.exists() else pd.DataFrame()
+    repurchasing = set(wl["code5"]) if not wl.empty else set()
+    top10_map = {} if wl.empty else dict(zip(wl["code5"], wl["top10"]))
+
     radar["spring_duck"] = radar["code5"].isin(duck_flags).astype(int)
     radar["l_shape_stage"] = radar["code5"].map(lshape_stage).fillna("")
+    radar["回購中"] = radar["code5"].isin(repurchasing).astype(int)
+    radar["top10"] = radar["code5"].map(top10_map)
     radar["三訊號齊"] = ((radar["spring_duck"] == 1)
                      & (radar["l_shape_stage"] == "GO_等表演")).astype(int)
+    radar["四重證據"] = ((radar["spring_duck"] == 1)
+                    & (radar["l_shape_stage"] == "GO_等表演")
+                    & (radar["回購中"] == 1)).astype(int)
 
     scan_date = radar["scan_date"].iloc[0]
     md = [f"# STOCKSCAN Morning Brief {scan_date}",
           "",
           f"當日爆量榜 {len(radar)} 隻；春江鴨（貨源）旗 {int(radar['spring_duck'].sum())}；"
           f"L 型前置（事件）旗 {int((radar['l_shape_stage'] == 'GO_等表演').sum())}；"
-          f"三訊號齊 {int(radar['三訊號齊'].sum())} 隻。",
+          f"回購中旗 {int(radar['回購中'].sum())}；"
+          f"三訊號齊 {int(radar['三訊號齊'].sum())} 隻；"
+          f"四重證據（+回購）{int(radar['四重證據'].sum())} 隻。",
           "",
-          "| code5 | 名稱 | close | 升跌% | 成交額 | 市值 | 倍數 | 春江鴨 | L型 |",
-          "|---|---|---:|---:|---:|---:|---:|:-:|:-:|"]
+          "| code5 | 名稱 | close | 升跌% | 成交額 | 市值 | 倍數 | 春江鴨 | L型 | 回購 | Top10% |",
+          "|---|---|---:|---:|---:|---:|---:|:-:|:-:|:-:|---:|"]
     for _, r in radar.iterrows():
+        t10 = r["top10"]
+        t10s = f"{float(t10):.1f}" if pd.notna(t10) else "—"
         md.append(
             f"| {r['code5']} | {r['name']} | {r['close']} | {r['chg_pct']} | "
             f"{pd.to_numeric(r['turnover_day']) / 1e6:,.1f}M | "
             f"{pd.to_numeric(r['mcap_total']) / 1e8:,.2f}億 | {r['ratio']} | "
-            f"{'✅' if r['spring_duck'] else '—'} | {r['l_shape_stage'] or '—'} |")
+            f"{'✅' if r['spring_duck'] else '—'} | {r['l_shape_stage'] or '—'} | "
+            f"{'✅' if r['回購中'] else '—'} | {t10s} |")
     md += ["", "> 只供學術研究及風險分析，不構成投資建議。只列名單旗標，唔排名唔推薦。"]
     dest = DATA_DIR / "reports" / f"morning_brief_{d:%Y%m%d}.md"
     dest.write_text("\n".join(md), encoding="utf-8")

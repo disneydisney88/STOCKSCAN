@@ -23,6 +23,8 @@ FEATURES = [
     "ccass_top10_pct", "concentration_rising",
     # Webb dump dailylog（of-issued 口徑，2025-04→12 覆蓋面板前半）
     "dump_top10_pct_of_issued", "dump_concentration_rising",
+    # P6c 回購特徵（⑤延伸）
+    "repurchasing_30d",
     # P6c 交叉分組（⑤）
     "dump_top10_x_appearance", "dump_top10_x_mcap",
 ]
@@ -67,6 +69,30 @@ def _asof_features(df: pd.DataFrame) -> pd.DataFrame:
               "dump_top10_pct_of_issued", "dump_concentration_rising"):
         if c not in d:
             d[c] = np.nan
+
+    # P6c 回購特徵：上榜日 ±30 日內有回購紀錄（研究站快照；覆蓋隨快照累積）
+    try:
+        import sqlite3
+        con = sqlite3.connect(f"file:{DATA_DIR / 'events.db'}?mode=ro", uri=True)
+        rp = pd.read_sql_query("SELECT code5, repurchase_date FROM repurchase_daily",
+                               con, dtype={"code5": str})
+        con.close()
+        rp["code5"] = rp["code5"].str.zfill(5)
+        rp["d"] = pd.to_datetime(rp["repurchase_date"], errors="coerce")
+        rp = rp.dropna(subset=["d"])
+        s0 = pd.to_datetime(d["scan_date"], errors="coerce")
+        repurch = np.zeros(len(d), dtype=int)
+        code_arr = d["code5"].astype(str).values
+        s_arr = s0.values
+        for c5, dt in zip(rp["code5"].values, rp["d"].values):
+            hit = (code_arr == c5) & (s_arr >= np.datetime64(dt - pd.Timedelta(days=30)))                   & (s_arr <= np.datetime64(dt))
+            repurch |= hit.astype(int)
+        d["repurchasing_30d"] = repurch
+    except Exception:
+        d["repurchasing_30d"] = 0
+
+    # P6c 回購特徵
+    # （研究站快照係 2026-09-19 一次性抓取，歷史覆蓋有限；隨快照定期更新而累積）
 
     # P6c 交叉分組（⑤）：集中度 bin × 上榜次數／市值。n≥20 紀律照跟。
     pct_bin = _groups(d.get("dump_top10_pct_of_issued", pd.Series(index=d.index, dtype="float64")),
@@ -157,6 +183,9 @@ def _groups(s: pd.Series, feature: str) -> pd.Series:
         x = pd.to_numeric(s, errors="coerce")
         label = x.map({1.0: "rising(>+1pp)", 0.5: "flat(±1pp)", 0.0: "falling(<-1pp)"})
         return label.where(x.notna(), "unknown")
+    if feature == "repurchasing_30d":
+        x = pd.to_numeric(s, errors="coerce")
+        return x.map({1: "回購中(30日內)", 0: "無回購紀錄"}).fillna("unknown")
     return s.fillna("unknown").astype(str)
 
 

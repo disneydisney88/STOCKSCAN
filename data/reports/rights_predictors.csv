@@ -41,6 +41,7 @@ dump_concentration_rising,falling(<-1pp),334,led_to_rights_180d,0.05988,0.026511
 dump_concentration_rising,flat(±1pp),1115,led_to_rights_180d,0.015247,0.026511,0.575097,
 dump_concentration_rising,rising(>+1pp),424,led_to_rights_180d,0.023585,0.026511,0.889614,
 dump_concentration_rising,unknown,2163,led_to_rights_180d,0.027739,0.026511,1.046314,
+repurchasing_30d,無回購紀錄,4036,led_to_rights_180d,0.026511,0.026511,1.0,
 dump_top10_x_appearance,20-40%×1,218,led_to_rights_180d,0.050459,0.026511,1.903284,
 dump_top10_x_appearance,20-40%×2,135,led_to_rights_180d,0.037037,0.026511,1.397023,
 dump_top10_x_appearance,20-40%×3-4,95,led_to_rights_180d,0.031579,0.026511,1.191146,
