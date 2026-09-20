@@ -9,6 +9,7 @@ Ctrl-C 安全退出（state 每輪落盤）。"""
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 import time
 from datetime import date
