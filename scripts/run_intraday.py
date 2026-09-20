@@ -12,7 +12,7 @@ import argparse
 import os
 import sys
 import time
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -57,7 +57,7 @@ def main() -> int:
         return 2
 
     if args.once and not in_scan_session():
-        now = datetime.now(ZoneInfo("Asia/Hong_Kong"))
+        now = datetime.now(HKT)
         print(f"[run_intraday] {now:%H:%M} HKT 非掃描時段（cron 模式秒退）。")
         return 0
 
