@@ -55,6 +55,31 @@ st.sidebar.caption(f"資料日曆以 HKT 計算：{today_hkt():%Y-%m-%d}")
 RTSS_8_COLS = ["code5", "name", "close", "chg_pct",
                "turnover_day", "mcap_total", "ratio", "turnover_to_mcap"]
 
+# 顯示層中文化（數據檔保持英文機讀）
+COL_ZH = {
+    "scan_date": "日期", "code5": "代號", "name": "名稱", "close": "收市價",
+    "chg_pct": "升跌%", "turnover_day": "成交額", "mcap_total": "市值",
+    "mcap_hk": "市值(港元)", "ratio": "成交倍數", "turnover_to_mcap": "成交/市值",
+    "top10_pct": "Top10%", "has_broker_shot": "券商射倉", "spring_duck_flag": "春江鴨旗",
+    "appearance_seq": "上榜次數", "days_since_first": "距首次(日)",
+    "entry_close": "入冊收市", "entry_intraday": "入冊即市*",
+    "entry_intraday_note": "即市註記", "price_missing": "價格缺失",
+    "days_available": "已有交易日", "ret_t5": "t+5%", "ret_t10": "t+10%",
+    "ret_t20": "t+20%", "ret_t60": "t+60%", "event_type": "事件",
+    "last_event_date": "最近事件日", "days_since": "距今日(日)",
+    "has_follow_up_raise": "其後配供", "l_shape_stage": "L型階段",
+    "in_kl_xlsx": "KL清單", "last_go_type": "GO類", "last_go_date": "GO日",
+    "days_since_go": "距GO(日)", "dump_asof_date": "dump數據日",
+    "dump_top10_pct_of_issued": "Top10%(股本口徑)",
+    "dump_concentration_rising": "集中度升跌", "dump_corp_action_in_window": "窗口內財技",
+    "ccass_top10_pct": "Top10%(warm cache)", "hd_top10_pct_of_ccass": "Top10%(of-CCASS)",
+}
+
+
+def zh_cols(df: pd.DataFrame) -> pd.DataFrame:
+    """顯示用：已知欄位轉中文名，未知保持原樣。"""
+    return df.rename(columns={c: t for c, t in COL_ZH.items() if c in df.columns})
+
 
 def eod_files() -> list[Path]:
     return sorted(EOD_DIR.glob("radar_eod_*.csv"), reverse=True)
@@ -81,33 +106,74 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11, tab12 = st.t
      "🧮 集中度歷史"])
 
 with tab1:
+    with st.expander("📖 說明／定義（RTSS 係乜、欄位解說）"):
+        st.markdown(
+            "**RTSS（倍升RtSS）定義**：一個 Telegram 頻道，每個交易日收市後公佈「爆量榜」——"
+            "列出當日成交額相對近期倍升嘅細價股。STOCKSCAN 訊號 A 用同一口徑自動重算，"
+            "每日榜單同 RTSS 對照（🔬 對照 RTSS tab，過關門檻 ≥10/15 命中）。\n\n"
+            "**訊號 A 口徑**（config.py）：\n"
+            "- 市值 <10 億港元（last_price × 總股數）\n"
+            "- 當日成交額 >50 萬港元\n"
+            "- 當日成交額 ÷ 前 10 個交易日平均成交額（唔計今日）≥ **10 倍**\n\n"
+            "**欄位解說**：close＝收市價；chg_pct＝當日升跌%；turnover_day＝當日成交額；"
+            "mcap_total＝市值；ratio＝當日成交÷前10日均（幾多倍）；turnover_to_mcap＝成交額÷市值（%）。"
+            "成交額／市值單位：百萬港元（M）。\n\n"
+            "**用法**：上方揀日期睇單日，或用下載按鈕攞單日／所有日期合併 CSV。")
     files = [f for f in eod_files() if f.name not in {"radar_eod_panel.csv", "radar_eod_panel_full.csv"}]
     if not files:
         st.warning("未有 radar_eod_*.csv。先喺本機跑：`python scripts/run_eod.py`")
     else:
         labels = {f: f.name.replace("radar_eod_", "").replace(".csv", "") for f in files}
-        pick = st.selectbox("揀日期", list(labels.keys()),
-                            format_func=lambda f: labels[f])
-        df = read_csv_if_exists(pick)
-        if df.empty:
-            st.info("呢個檔係空嘅（當日冇命中）。")
+        picks = st.multiselect("揀日期（可選多日）", list(labels.keys()),
+                               default=list(labels.keys())[:1],
+                               format_func=lambda f: labels[f])
+        if not picks:
+            st.warning("請揀至少一個日期。")
         else:
-            c1, c2, c3 = st.columns(3)
-            c1.metric("上榜股票", len(df))
-            ratios = pd.to_numeric(df.get("ratio"), errors="coerce")
-            c2.metric("最高成交倍數", f"{ratios.max():,.1f}x" if ratios.notna().any() else "—")
-            c3.metric("數據截至", data_asof(df))
-            st.caption(f"共 {len(df)} 隻，按市值由細到大（RTSS 口徑）。"
-                       "成交額／市值單位：百萬港元（M）。　數據截至：" + data_asof(df))
-            st.table(fmt_df(df[RTSS_8_COLS]).style.hide(axis="index"))
-            st.download_button("⬇️ 下載完整 CSV",
-                               df.to_csv(index=False).encode("utf-8-sig"),
-                               file_name=pick.name, mime="text/csv")
+            dfs = []
+            for f in picks:
+                df_i = read_csv_if_exists(f)
+                if not df_i.empty:
+                    df_i.insert(0, "日期", labels[f])
+                    dfs.append(df_i)
+            df = pd.concat(dfs, ignore_index=True) if len(dfs) > 1 else (dfs[0] if dfs else pd.DataFrame())
+            if df.empty:
+                st.info("所選日期都係空檔（當日冇命中）。")
+            else:
+                c1, c2, c3 = st.columns(3)
+                c1.metric("上榜股票", len(df))
+                ratios = pd.to_numeric(df.get("ratio"), errors="coerce")
+                c2.metric("最高成交倍數", f"{ratios.max():,.1f}x" if ratios.notna().any() else "—")
+                c3.metric("數據截至", data_asof(df))
+                st.caption(f"所選 {len(picks)} 日合共 {len(df)} 行（RTSS 口徑）。"
+                           "成交額／市值單位：百萬港元（M）。　數據截至：" + data_asof(df))
+                show_cols = ["日期"] + [c for c in RTSS_8_COLS if c in df.columns]
+                st.dataframe(zh_cols(fmt_df(df[show_cols])), use_container_width=True,
+                             height=520, hide_index=True)
+                sel_name = "_".join(labels[f] for f in picks)
+                st.download_button("⬇️ 下載所選日期 CSV",
+                                   df.to_csv(index=False).encode("utf-8-sig"),
+                                   file_name=f"radar_eod_{sel_name}.csv", mime="text/csv")
+                all_days = pd.concat(
+                    [read_csv_if_exists(f) for f in eod_files()], ignore_index=True)
+                st.download_button("⬇️ 下載所有日期（合併 CSV）",
+                                   all_days.to_csv(index=False).encode("utf-8-sig"),
+                                   file_name=f"radar_eod_all_{today_hkt():%Y%m%d}.csv",
+                                   mime="text/csv")
 
 with tab2:
     with st.expander("ℹ️ 掃描規則（按需要展開）"):
         st.markdown("SURGE（急升）：市值 <10 億、即市成交 ≥50 萬、升幅 ≥+20%，每多 20pt 再發。\n\n"
                     "VOLUME（爆量）：即市成交 ÷ ma10 ≥ 10x，每多 10x 再發。各計「當日第 N 次」。")
+    with st.expander("📖 說明／定義（快照欄位、Cloud 部署）"):
+        st.markdown(
+            "兩個即市訊號（交易時段 09:30–12:00／13:00–16:10 HKT 自動掃，每 5 分鐘一圈）：\n\n"
+            "- **SURGE（急升）**：市值 <10 億、即市成交 ≥50 萬、即市升幅 ≥+20%，每多 20pt 再發\n"
+            "- **VOLUME（爆量）**：即市成交額 ÷ 前 10 日均 ≥ 10x，每多 10x 再發（級距制）\n"
+            "- 各計「當日第 N 次」，alert 欄會標\n\n"
+            "**時點快照**：每日 10:30/11:30/13:30/15:30/16:00 影低當時 ratio≥10 嘅股——"
+            "close／升跌係「嗰一刻」值；⭐＝該日首次出現。\n\n"
+            "**Cloud 部署**：即市掃描要 Longbridge secrets；冇設定就只顯示唯讀 alert。")
     left, right = st.columns([1, 2])
     with left:
         run_btn = st.button("⚡ 即掃一次（本機）", type="primary",
@@ -188,6 +254,13 @@ with tab2:
 with tab3:
     st.caption(f"訊號 A 對照「倍升RtSS」{RTSS_FIXTURE_DATE} 榜（15 隻，手打 fixture）。"
                "命中 ≥10/15 為過關門檻。")
+    with st.expander("📖 說明／定義"):
+        st.markdown(
+            "以手打 RTSS fixture（15 隻）做基準對照：\n\n"
+            "- **命中**：RTSS 有、我哋訊號 A 亦出（口徑一致嘅證據）\n"
+            "- **我哋多咗**：我哋出、RTSS 冇（RTSS 人手漏列或我哋門檻較闊）\n"
+            "- **我哋漏咗**：RTSS 有、我哋冇（要逐單查：停牌／門檻邊緣）\n\n"
+            "每日版本喺「9️⃣ RTSS 對照」tab。")
     uni3 = read_csv_if_exists(UNIVERSE_CSV)
     nmap = {}
     if not uni3.empty:
@@ -213,6 +286,13 @@ with tab3:
         st.info("未有對照結果。跑：`python scripts/run_eod.py --date 2026-09-04`")
 
 with tab4:
+    with st.expander("📖 說明／定義"):
+        st.markdown(
+            "歷史面板＝每日訊號 A 命中股嘅時間序列（13 個月、4,036 stock-day）。\n\n"
+            "- 條形圖＝每日上榜隻數（中位約 13 隻）\n"
+            "- 右表＝上榜次數王（出現越密＝越活躍）\n"
+            "- 揀股睇佢全部上榜日\n\n"
+            "研究參考：上榜股 t+60 超額回報為負——上榜榜單唔係買入清單（詳見📕 追蹤簿 tab）。")
     panel = read_csv_if_exists(EOD_DIR / "radar_eod_panel.csv")
     if panel.empty:
         st.info("未有面板。跑：`python scripts/backfill_eod.py --start 2026-08-10 --end 2026-09-07`")
@@ -240,6 +320,11 @@ with tab4:
                          use_container_width=True, height=800, hide_index=True)
 
 with tab5:
+    with st.expander("📖 說明／定義"):
+        st.markdown(
+            "事件率＝上榜日起計 180 日內各類財技（GO／合股／配股／供股）公佈比率，"
+            "對照基準組（非上榜、成交 ≥1M、市值 <10 億）。\n\n"
+            "上榜組 GO 3.26% vs 全體基準 3.40%——基準口徑唔同，小心解讀；只列數字。")
     report = DATA_DIR / "reports" / "go_timing_summary.csv"
     if not report.exists():
         st.info("未有事件率報表。跑：`python scripts/report_go_timing.py`")
@@ -257,6 +342,15 @@ with tab6:
     from stockscan.events import events_after
 
     st.caption("輸入 5 位代號，聚合宇宙／面板／事件庫／券商射倉／RTSS 回放／CCASS／即市 alert。研究用，唔構成投資建議。")
+    with st.expander("📖 說明／定義"):
+        st.markdown(
+            "一格睇晒一隻股喺所有庫嘅紀錄：\n\n"
+            "1. **價格＋上榜日**——13 個月日 K，標示歷次上榜日\n"
+            "2. **事件**——events.db 財技事件（GO/供股/配股/合股/CB/私有化等，4,322 行）\n"
+            "3. **券商射倉**——上榜日 ±5 日席位異動\n"
+            "4. **RTSS 回放**——該股喺 RTSS 歷史 alert 出現次數\n"
+            "5. **CCASS**——集中度（有數據先顯示）\n"
+            "6. **即市 alert**——即市掃描歷史")
     code_input = st.text_input("股票代號（5 位）", value="01825", max_chars=5).strip().zfill(5)
 
     uni_all = read_csv_if_exists(UNIVERSE_CSV)
@@ -366,6 +460,14 @@ with tab6:
 
 with tab7:
     st.caption("逐日 RTSS 純文字 alert 對照 STOCKSCAN 即市 alert；原始 RTSS 文字不會上載或顯示。")
+    with st.expander("📖 說明／定義"):
+        st.markdown(
+            "**三類分組**：\n"
+            "- **both**——兩邊都出\n"
+            "- **rtss_only**——RTSS 有／我哋冇（即市掃描未開或門檻未到）\n"
+            "- **stockscan_only**——我哋有／RTSS 冇（RTSS 漏列或門檻差異）\n\n"
+            "注意：對照嘅係「即市 alert」（訊號 B），唔係收市榜（訊號 A）。"
+            "RTSS 資料由本機 Chrome CDP 抓取，每日 sync 上雲。")
     diff_files = sorted((DATA_DIR / "reports").glob("rtss_daily_diff_*.csv"), reverse=True)
     if not diff_files:
         st.info("未有逐日 diff。先跑 `python scripts/compare_rtss_daily.py --date YYYY-MM-DD`。")
@@ -401,7 +503,14 @@ with tab7:
             st.info("呢日未有可對照資料。")
 
 with tab8:
-    st.caption("春江鴨＝爆量上榜 ＋ 貨源異動證據（上榜日 ±5 日有券商射倉；CCASS Top10 待 M7 上游通後自動補）。只列旗標，唔構成投資建議。")
+    st.caption("春江鴨＝爆量上榜 ＋ 貨源異動證據（券商射倉；或 CCASS Top10 ≥60% 歸邊）。只列旗標，唔構成投資建議。")
+    with st.expander("📖 說明／定義"):
+        st.markdown(
+            "**春江鴨邏輯**：爆量上榜（價量異動）＋「有人收貨」證據——\n"
+            "- 上榜日 ±5 日有券商席位大幅異動\n"
+            "- 或 CCASS Top10 ≥60%（貨源歸邊；09-20 前版本只計「有 Top10 資料」）\n\n"
+            "**欄位**：top10_pct＝Top10 佔已發行股本（T-2 結算日）；has_broker_shot＝±5 日券商射倉；"
+            "spring_duck_flag＝任一成立。**下載**：揀單日或所有日期合併 CSV。")
     duck_files = sorted((DATA_DIR / "reports").glob("spring_duck_*.csv"), reverse=True)
     if not duck_files:
         st.info("未有報表。跑：`python scripts/spring_duck.py`")
@@ -410,25 +519,56 @@ with tab8:
         flagged = ddf[ddf["spring_duck_flag"] == 1] if not ddf.empty else ddf
         st.caption(f"{duck_files[0].name}　flag=1 共 {len(flagged)}/{len(ddf)} 行")
         if not flagged.empty:
-            pick_day = st.selectbox("揀日期", sorted(flagged["scan_date"].unique(), reverse=True),
-                                    key="duck_day")
-            st.dataframe(flagged[flagged["scan_date"] == pick_day],
-                         use_container_width=True, height=800, hide_index=True)
+            pick_days = st.multiselect("揀日期（可選多日）",
+                                       sorted(flagged["scan_date"].unique(), reverse=True),
+                                       default=[sorted(flagged["scan_date"].unique(),
+                                                       reverse=True)[0]])
+            if not pick_days:
+                st.warning("請揀至少一個日期。")
+            else:
+                pick_df = zh_cols(flagged[flagged["scan_date"].isin(pick_days)])
+                st.dataframe(pick_df, use_container_width=True, height=800, hide_index=True)
+                sel_name = "_".join(pick_days)
+                st.download_button("⬇️ 下載所選日期 CSV",
+                                   pick_df.to_csv(index=False).encode("utf-8-sig"),
+                                   file_name=f"spring_duck_{sel_name}.csv", mime="text/csv")
+            st.download_button("⬇️ 下載所有日期（flag=1 合併 CSV）",
+                               zh_cols(flagged).to_csv(index=False).encode("utf-8-sig"),
+                               file_name=f"spring_duck_all_{today_hkt():%Y%m%d}.csv",
+                               mime="text/csv")
 
 with tab9:
     st.caption("L 型候選＝過去 180 日有 GO／換主，之後未見配股供股（等表演）。只列旗標，唔構成投資建議。")
-    l_files = sorted((DATA_DIR / "reports").glob("l_shape_candidates_*.csv"), reverse=True)
-    if not l_files:
-        st.info("未有報表。跑：`python scripts/l_shape.py`")
+    with st.expander("📖 說明／定義"):
+        st.markdown(
+            "**L 型候選定義**：過去 180 日有 GO／換主（轉主板），之後未見配股供股——"
+            "即「賣殼完成、等表演」階段。\n\n"
+            "**批次**：季度版本 2025Q3→2026Q3（每季首個交易日 refresh），另有即日快照；"
+            "「GO_等表演」＝候選，「GO_已配供」＝已開始配供（畢業）。"
+            "季度名單 `KL清單` 欄＝有冇喺你手動 L 型研究清單入面。")
+    batches = []
+    for qf in sorted((DATA_DIR / "reports").glob("l_shape_20*_Q*.csv"), reverse=True):
+        batches.append((f"{qf.stem.replace('l_shape_', '')}（季度批次）", qf))
+    for cf_ in sorted((DATA_DIR / "reports").glob("l_shape_candidates_*.csv"), reverse=True):
+        batches.append((f"{cf_.stem.replace('l_shape_candidates_', '')}（即日快照）", cf_))
+    if not batches:
+        st.info("未有報表。跑：`python scripts/l_shape.py` 或 `python scripts/refresh_l_shape.py`")
     else:
-        ldf = read_csv_if_exists(l_files[0])
+        labels = [b[0] for b in batches]
+        pick_batch = st.selectbox("揀批次（季度版 5 批＋即日快照）", labels)
+        sel = dict(batches)[pick_batch]
+        ldf = read_csv_if_exists(sel)
         if ldf.empty:
             st.write("無紀錄")
         else:
-            stage = st.selectbox("篩 stage", ["全部", "GO_等表演", "GO_已配供"], key="l_stage")
+            stage = st.selectbox("篩 stage", ["全部", "GO_等表演", "GO_已配供"], key="l_stage") \
+                if "l_shape_stage" in ldf.columns else "全部"
             show = ldf if stage == "全部" else ldf[ldf["l_shape_stage"] == stage]
-            st.caption(f"{l_files[0].name}　{len(show)}/{len(ldf)} 隻")
-            st.dataframe(show, use_container_width=True, height=800, hide_index=True)
+            st.caption(f"{sel.name}　{len(show)}/{len(ldf)} 隻")
+            st.dataframe(zh_cols(show), use_container_width=True, height=800, hide_index=True)
+            st.download_button("⬇️ 下載呢批 CSV",
+                               show.to_csv(index=False).encode("utf-8-sig"),
+                               file_name=sel.name, mime="text/csv")
 
 with tab10:
     # ── P6 追蹤簿：上榜嗰刻起追 t+5/10/20/60（規格書 §5）──
@@ -472,7 +612,7 @@ with tab10:
             st.caption("中位數只計 ret_t20 非 _est 行；_est 行數見 tracking_summary.csv n_est 欄。")
 
         st.subheader(f"明細（{len(show)} 行）")
-        st.dataframe(show, use_container_width=True, height=520, hide_index=True)
+        st.dataframe(zh_cols(show), use_container_width=True, height=520, hide_index=True)
 
         # 個股 drill-down：所有上榜日 + 價格路徑
         st.subheader("個股 drill-down")
@@ -485,7 +625,7 @@ with tab10:
                 key="trk_code")
             rows = te[te["code5"] == pick].sort_values("scan_date")
             st.caption(f"{pick} 共上榜 {len(rows)} 次（簿B 逐筆）")
-            st.dataframe(rows, use_container_width=True, height=420, hide_index=True)
+            st.dataframe(zh_cols(rows), use_container_width=True, height=420, hide_index=True)
             kdf = kline_cache.load(pick)
             if kdf is not None and not kdf.empty:
                 kdf = kdf.copy()
@@ -581,7 +721,8 @@ with tab12:
         series = concentration_series(payloads.get(code12) or [])
     except Exception as e:  # noqa: BLE001——Turso 讀唔到唔好炸成個 tab
         series = []
-        st.warning(f"Turso 讀取失敗：{e!r}")
+        st.warning(f"Turso 讀取失敗：{e!r}。要在雲端啟用：Manage app → Secrets 加入 "
+                   "TURSO_DATABASE_URL／TURSO_AUTH_TOKEN（值同 _secrets/.env）。")
 
     chart_rows = []
     for r in series:  # warm cache 源（近窗，webb 原始口徑）
@@ -617,7 +758,8 @@ with tab12:
                                  "ccass_top10_pct", "hd_top10_pct_of_ccass")
                      if c in row12.columns]
         st.subheader("追蹤簿上榜日嘅 as-of 值（T-2 交易日對齊）")
-        st.dataframe(row12[show_cols], use_container_width=True, height=280, hide_index=True)
+        st.dataframe(zh_cols(row12[show_cols]), use_container_width=True, height=280,
+                     hide_index=True)
 
     # 財技事件旗（上榜研究必睇嘅背景）
     import sqlite3
