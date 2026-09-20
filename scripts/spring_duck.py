@@ -27,13 +27,21 @@ def build() -> pd.DataFrame:
     extra = []
     for f in sorted(EOD_DIR.glob("radar_eod_2*.csv")):
         d = f.name.replace("radar_eod_", "").replace(".csv", "")
-        if len(d) == 8 and d not in covered:
-            df = pd.read_csv(f, dtype={"code5": str}, encoding="utf-8-sig")
-            if not df.empty:
-                df.insert(0, "scan_date", f"{d[:4]}-{d[4:6]}-{d[6:]}")
-                extra.append(df)
+        if len(d) != 8:
+            continue
+        ds = f"{d[:4]}-{d[4:6]}-{d[6:]}"  # 檔名無虛線，panel 係有虛線——唔 normalize 會全重複（09-20 修）
+        if ds in covered:
+            continue
+        df = pd.read_csv(f, dtype={"code5": str}, encoding="utf-8-sig")
+        if not df.empty:
+            df.insert(0, "scan_date", ds)
+            extra.append(df)
     if extra:
         panel = pd.concat([panel] + extra, ignore_index=True)
+    before_dedup = len(panel)
+    panel = panel.drop_duplicates(["scan_date", "code5"], keep="first")
+    if len(panel) != before_dedup:
+        print(f"[spring_duck] ⚠ 去除 {before_dedup - len(panel)} 行重複 (scan_date, code5)")
 
     if "has_broker_shot" not in panel.columns:
         panel["has_broker_shot"] = 0

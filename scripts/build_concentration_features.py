@@ -221,7 +221,10 @@ def build(panel_path: Path = PANEL) -> Path:
                 row["hd_top10_delta"] = round(new - old, 4)
         # 主力源：Webb dump dailylog（of-issued 口徑，2025-04-01→12-24 逐日）
         dg = dump_by_code.get(r.code5)
-        dump_use = dg[dg["date"] <= cutoff] if (dg is not None and cutoff) else None
+        dump_use = None
+        if dg is not None and cutoff:
+            lo = (pd.Timestamp(cutoff) - pd.Timedelta(days=30)).strftime("%Y-%m-%d")
+            dump_use = dg[(dg["date"] <= cutoff) & (dg["date"] >= lo)]
         if dump_use is not None and len(dump_use):
             last, first = dump_use.iloc[-1], dump_use.iloc[0]
             row["dump_asof_date"] = last["date"]
@@ -266,6 +269,17 @@ def build(panel_path: Path = PANEL) -> Path:
                     errors="ignore").merge(
                     old[["code5", "scan_date"] + old_dump_cols],
                     on=["code5", "scan_date"], how="left")
+                # 陳舊過濾：dump 數據日距 scan_date > 30 日＝太舊，唔准當 as-of（T-2 紀律）
+                d0 = pd.to_datetime(feat.get("dump_asof_date"), errors="coerce")
+                s0 = pd.to_datetime(feat["scan_date"], errors="coerce")
+                stale = (s0 - d0).dt.days > 30
+                stale_cols = ["dump_asof_date", "dump_c10_shares", "dump_issued_shares",
+                              "dump_top10_pct_of_issued", "dump_top10_pct_of_issued_raw",
+                              "dump_top10_delta_shares", "dump_window_days",
+                              "dump_concentration_rising"]
+                stale_cols = [c for c in stale_cols if c in feat.columns]
+                feat.loc[stale, stale_cols] = None
+                print(f"[ccass_feat] 陳舊過濾（>30日）：清除 {int(stale.sum())} 行 dump 值")
                 print(f"[ccass_feat] dump 源缺席：從舊 CSV 保留 {len(old_dump_cols)} 個 "
                       f"dump_* 欄位（{kept} 行有值）")
     dest = write_csv(feat, REPORTS / "ccass_concentration_features.csv")
