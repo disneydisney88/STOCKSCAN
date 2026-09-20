@@ -188,6 +188,13 @@ with tab2:
 with tab3:
     st.caption(f"訊號 A 對照「倍升RtSS」{RTSS_FIXTURE_DATE} 榜（15 隻，手打 fixture）。"
                "命中 ≥10/15 為過關門檻。")
+    uni3 = read_csv_if_exists(UNIVERSE_CSV)
+    nmap = {}
+    if not uni3.empty:
+        ncol = "name_hk" if "name_hk" in uni3.columns else "name_seed"
+        if ncol in uni3.columns:
+            nmap = dict(zip(uni3["code5"].astype(str).str.zfill(5),
+                            uni3[ncol].astype(str)))
     cmp_path = EOD_DIR / f"compare_rtss_{RTSS_FIXTURE_DATE}.json"
     if cmp_path.exists():
         res = json.loads(cmp_path.read_text(encoding="utf-8"))
@@ -195,9 +202,13 @@ with tab3:
         c1.metric("命中", f"{res['hit_count']}/{res['n_fixture']}")
         c2.metric("我哋多咗", len(res["extra"]))
         c3.metric("我哋漏咗", len(res["missing"]))
-        st.write(f"**命中**：{', '.join(res['hits']) or '—'}")
-        st.write(f"**漏咗**：{', '.join(res['missing']) or '—'}")
-        st.write(f"**多咗**：{', '.join(res['extra']) or '—'}")
+
+        def _with_names(codes):
+            return ", ".join(f"{c} {nmap.get(c, '')}".strip() for c in codes) or "—"
+
+        st.write(f"**命中**：{_with_names(res['hits'])}")
+        st.write(f"**漏咗**：{_with_names(res['missing'])}")
+        st.write(f"**多咗**：{_with_names(res['extra'])}")
     else:
         st.info("未有對照結果。跑：`python scripts/run_eod.py --date 2026-09-04`")
 
