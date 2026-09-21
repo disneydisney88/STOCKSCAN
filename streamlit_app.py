@@ -502,25 +502,15 @@ with tab7:
         else:
             st.info("呢日未有可對照資料。")
 
-with tab8:
-    st.caption("春江鴨＝爆量上榜 ＋ 貨源異動證據（券商射倉；或 CCASS Top10 ≥60% 歸邊）。只列旗標，唔構成投資建議。")
-    with st.expander("📖 詳解：春江鴨係乜、數據邊度嚟、點讀"):
+with tab9:
+    st.caption("L 型候選＝過去 180 日有 GO／換主，之後未見配股供股（等表演）。只列旗標，唔構成投資建議。")
+    with st.expander("📖 說明／定義"):
         st.markdown(
-            "**春江鴨係三源組合指標**——爆量上榜（價量異動）＋「有人收貨」證據，"
-            "任一成立就 flag=1。佢本身冇自己嘅數據庫，係將三個源 join 埋：\n\n"
-            "**① 價量（爆量上榜）**——Longbridge 日 K 收市數據，Actions 每日掃全宇宙 "
-            "（市值<10億、成交>50萬、當日成交÷前10日均≥10倍）→ 面板 4,094 stock-day。"
-            "❌唔係 RTSS 俾嘅數——RTSS 只係對照基準。\n\n"
-            "**② 券商射倉**——你提供嘅 4 個 Excel（2025-11→2026-08-05），記錄邊個券商席位增減；"
-            "上榜日 ±5 日有大幅席位變動＝「有人收貨」。⚠️ 呢個源停喺 08-05，要新 Excel 先更新。\n\n"
-            "**③ CCASS Top10%**——Webb 官方 dump（2025-04→12，of-issued 口徑）＋每日 warm cache "
-            "（近 15 個結算日），T-2 交易日對齊；≥60%＝歸邊證據。\n\n"
-            "**欄位**：top10_pct＝Top10 佔已發行股本；has_broker_shot＝±5 日券商射倉；"
-            "spring_duck_flag＝任一成立。\n\n"
-            "**Double count 已修（09-20）**：之前單日 radar 檔同面板重複 append "
-            "（8,130 行、出現次數計雙）；而家 4,094 行零重複，"
-            "每個（日期，代號）只有一行，出現次數係真。\n\n"
-            "**下載**：可揀單日／多日／所有日期（flag=1）合併 CSV。")
+            "**L 型候選定義**：過去 180 日有 GO／換主（轉主板），之後未見配股供股——"
+            "即「賣殼完成、等表演」階段。\n\n"
+            "**批次**：季度版本 2025Q3→2026Q3（每季首個交易日 refresh），另有即日快照；"
+            "「GO_等表演」＝候選，「GO_已配供」＝已開始配供（畢業）。"
+            "季度名單 `KL清單` 欄＝有冇喺你手動 L 型研究清單入面。")
     batches = []
     for qf in sorted((DATA_DIR / "reports").glob("l_shape_20*_Q*.csv"), reverse=True):
         batches.append((f"{qf.stem.replace('l_shape_', '')}（季度批次）", qf))
@@ -544,6 +534,66 @@ with tab8:
             st.download_button("⬇️ 下載呢批 CSV",
                                show.to_csv(index=False).encode("utf-8-sig"),
                                file_name=sel.name, mime="text/csv")
+
+with tab8:
+    st.caption("春江鴨＝爆量上榜 ＋ 貨源異動證據（券商射倉；或 CCASS Top10 ≥60% 歸邊）。只列旗標，唔構成投資建議。")
+    with st.expander("📖 詳解：春江鴨係乜、數據邊度嚟、點讀"):
+        st.markdown(
+            "**春江鴨係三源組合指標**——爆量上榜（價量異動）＋「有人收貨」證據，"
+            "任一成立就 flag=1。佢本身冇自己嘅數據庫，係將三個源 join 埋：\n\n"
+            "**① 價量（爆量上榜）**——Longbridge 日 K 收市數據，Actions 每日掃全宇宙 "
+            "（市值<10億、成交>50萬、當日成交÷前10日均≥10倍）→ 面板 4,094 stock-day。"
+            "❌唔係 RTSS 俾嘅數——RTSS 只係對照基準。\n\n"
+            "**② 券商射倉**——你提供嘅 4 個 Excel（2025-11→2026-08-05），記錄邊個券商席位增減；"
+            "上榜日 ±5 日有大幅席位變動＝「有人收貨」。⚠️ 呢個源停喺 08-05，要新 Excel 先更新。\n\n"
+            "**③ CCASS Top10%**——Webb 官方 dump（2025-04→12，of-issued 口徑）＋每日 warm cache "
+            "（近 15 個結算日），T-2 交易日對齊；≥60%＝歸邊證據。\n\n"
+            "**欄位**：top10_pct＝Top10 佔已發行股本；has_broker_shot＝±5 日券商射倉；"
+            "spring_duck_flag＝任一成立。\n\n"
+            "**Double count 已修（09-20）**：之前單日 radar 檔同面板重複 append "
+            "（8,130 行、出現次數計雙）；而家 4,094 行零重複，"
+            "每個（日期，代號）只有一行，出現次數係真。\n\n"
+            "**下載**：可揀單日／多日／所有日期（flag=1）合併 CSV。")
+    duck_files = sorted((DATA_DIR / "reports").glob("spring_duck_*.csv"), reverse=True)
+    if not duck_files:
+        st.info("未有報表。跑：`python scripts/spring_duck.py`")
+    else:
+        ddf = read_csv_if_exists(duck_files[0])
+        if ddf.empty:
+            st.write("無紀錄")
+        else:
+            flagged = ddf[ddf["spring_duck_flag"] == 1]
+            st.caption(f"{duck_files[0].name}　flag=1 共 {len(flagged)}/{len(ddf)} 行")
+            pick_days = st.multiselect(
+                "揀日期（可選多日）",
+                sorted(flagged["scan_date"].unique(), reverse=True),
+                default=[sorted(flagged["scan_date"].unique(), reverse=True)[0]])
+            if not pick_days:
+                st.warning("請揀至少一個日期。")
+            else:
+                pick_df = zh_cols(flagged[flagged["scan_date"].isin(pick_days)])
+                st.dataframe(pick_df, use_container_width=True, height=800, hide_index=True)
+                sel_name = "_".join(pick_days)
+                st.download_button("⬇️ 下載所選日期 CSV",
+                                   pick_df.to_csv(index=False).encode("utf-8-sig"),
+                                   file_name=f"spring_duck_{sel_name}.csv", mime="text/csv")
+            st.download_button("⬇️ 下載所有日期（flag=1 合併 CSV）",
+                               zh_cols(flagged).to_csv(index=False).encode("utf-8-sig"),
+                               file_name=f"spring_duck_all_{today_hkt():%Y%m%d}.csv",
+                               mime="text/csv")
+
+    # ── P6c 回購×歸邊 watchlist（三重證據清單）──
+    st.subheader("🎯 回購×歸邊 watchlist")
+    wl = read_csv_if_exists(DATA_DIR / "reports" / "buyback_concentrated_watchlist.csv")
+    if wl.empty:
+        st.info("未有 watchlist。跑：`python scripts/build_repurchase_watchlist.py`")
+    else:
+        st.caption("回購中（研究站同花順快照 45 日內有回購）× CCASS Top10≥60% 歸邊——"
+                   "兩個「有人收貨」證據同時成立嘅股，附上榜次數／最近上榜／L型階段。只列數字。")
+        st.dataframe(zh_cols(wl), use_container_width=True, height=300, hide_index=True)
+        st.download_button("⬇️ 下載 watchlist CSV",
+                           wl.to_csv(index=False).encode("utf-8-sig"),
+                           file_name="buyback_concentrated_watchlist.csv", mime="text/csv")
 
 with tab10:
     # ── P6 追蹤簿：上榜嗰刻起追 t+5/10/20/60（規格書 §5）──
