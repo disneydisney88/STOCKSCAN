@@ -38,6 +38,54 @@ TITLE_DATE_RE = re.compile(r"^(\d{1,2} [A-Za-z]+ \d{4}),")
 TIME_RE = re.compile(r"\b(\d{1,2}:\d{2}:\d{2})\b")
 
 
+def _safe_click(page, loc, label: str, js_first: bool = False, timeout: int = 5000):
+    """Click a Telegram control while leaving a precise diagnostic breadcrumb."""
+    print(f"[rtss-cdp] click {label}")
+    loc.wait_for(state="visible", timeout=timeout)
+    if js_first:
+        loc.evaluate("el => el.click()")
+        return
+    try:
+        loc.scroll_into_view_if_needed(timeout=timeout)
+        loc.click(timeout=timeout)
+    except PlaywrightTimeoutError:
+        print(f"[rtss-cdp] click {label} timed out; fallback js click")
+        loc.evaluate("el => el.click()")
+
+
+def _wait_for_right_column_stable(page, samples: int = 2, interval_ms: int = 200) -> None:
+    """Wait until Telegram's right column has stopped moving after search opens."""
+    right = page.locator("#RightColumn, .RightColumn").filter(visible=True).first
+    if not right.count():
+        return
+    previous = None
+    stable = 0
+    for _ in range(15):
+        box = right.bounding_box()
+        current = None if box is None else (round(box["x"], 1), round(box["width"], 1))
+        if current is not None and current == previous:
+            stable += 1
+            if stable >= samples:
+                return
+        else:
+            stable = 0
+            previous = current
+        page.wait_for_timeout(interval_ms)
+
+
+def _jump_control(page):
+    """Return the single visible Jump control in Telegram's header layout."""
+    loc = page.locator(
+        '#RightColumn [title="Jump to Date"], '
+        '.RightColumn [title="Jump to Date"], '
+        '#MiddleColumn [title="Jump to Date"]'
+    ).filter(visible=True)
+    count = loc.count()
+    if count > 1:
+        raise RuntimeError(f"Jump to Date control is ambiguous: {count} visible controls")
+    return loc
+
+
 def _date_from_title(title: str) -> date | None:
     match = TITLE_DATE_RE.search(title or "")
     if not match:
@@ -232,18 +280,24 @@ def _scroll_to_latest(page, target: date, max_iter: int = 300) -> None:
 
 def _ensure_jump_control(page) -> None:
     """Open Telegram Web A's search panel before locating its calendar control."""
-    ctl = page.locator('[title="Jump to Date"]')
-    if ctl.count() and ctl.first.is_visible():
+    ctl = _jump_control(page)
+    if ctl.count():
         return
-    for selector in ('[title="Search this chat"]', '[title="Search"]',
-                     '[aria-label="Search"]', 'button .icon-search'):
-        button = page.locator(selector).first
-        if button.count() and button.is_visible():
-            button.click()
-            page.wait_for_timeout(500)
-            break
-    ctl = page.locator('[title="Jump to Date"]')
-    if not (ctl.count() and ctl.first.is_visible()):
+    search = page.locator('#MiddleColumn [title="Search this chat"], .MiddleColumn [title="Search this chat"], #MiddleColumn [aria-label="Search this chat"]').filter(visible=True).first
+    if search.count():
+        search_open = bool(search.evaluate("el => el.classList.contains('clicked') || el.getAttribute('aria-expanded') === 'true'"))
+        if not search_open:
+            _safe_click(page, search, "middle-column search")
+        else:
+            print("[rtss-cdp] search panel already open")
+        _wait_for_right_column_stable(page)
+        for _ in range(20):
+            ctl = _jump_control(page)
+            if ctl.count():
+                break
+            page.wait_for_timeout(200)
+    ctl = _jump_control(page)
+    if not ctl.count():
         candidates = page.evaluate("""() => [...document.querySelectorAll(
           'button,[role="button"],[title],[aria-label]')]
           .map(e => ({cls:String(e.className), title:e.getAttribute('title'),
@@ -269,21 +323,31 @@ def _jump_to_date(page, target: date) -> None:
     before_labels = _visible_date_labels(page)
     # A prior interrupted/manual probe may leave the calendar modal open.
     # Close that stale backdrop before opening a fresh picker.
-    stale_close = page.locator("#portals [title='Close'], .modal-backdrop").first
+    stale_close = page.locator("#portals [title='Close'], #portals .modal-backdrop").first
     if stale_close.count() and stale_close.is_visible():
         try:
             if "modal-backdrop" in (stale_close.get_attribute("class") or ""):
-                stale_close.click(position={"x": 5, "y": 5})
+                print("[rtss-cdp] stale calendar backdrop detected; pressing Escape")
+                page.keyboard.press("Escape")
             else:
-                stale_close.click()
+                _safe_click(page, stale_close, "stale calendar close")
             page.wait_for_timeout(200)
         except PlaywrightTimeoutError:
             pass
     _ensure_jump_control(page)
-    ctl = page.locator('[title="Jump to Date"]').first
-    ctl.wait_for(state="visible", timeout=3000)
-    ctl.click()
-    page.wait_for_timeout(300)
+    ctl = _jump_control(page)
+    _safe_click(page, ctl, "Jump to Date", js_first=True)
+    portal = page.locator("#portals")
+    try:
+        portal.wait_for(state="visible", timeout=3000)
+    except PlaywrightTimeoutError:
+        print("[rtss-cdp] Jump to Date JS click did not open portal; fallback dispatch_event")
+        ctl.dispatch_event("click")
+        portal.wait_for(state="visible", timeout=3000)
+    for _ in range(15):
+        if [line.strip() for line in portal.inner_text().splitlines() if line.strip()]:
+            break
+        page.wait_for_timeout(200)
     month_name = picker_target.strftime("%B %Y")
     for _ in range(24):
         portal = page.locator("#portals")
@@ -308,7 +372,7 @@ def _jump_to_date(page, target: date) -> None:
                 f"direction={direction} control=missing_or_disabled"
             )
             return
-        arrow.click()
+        _safe_click(page, arrow, f"calendar {direction} month", timeout=3000)
         page.wait_for_timeout(100)
     else:
         raise RuntimeError(f"Telegram date picker could not reach {month_name}")
@@ -322,7 +386,7 @@ def _jump_to_date(page, target: date) -> None:
         raise RuntimeError(
             f"Telegram date picker has no enabled day {picker_target.day} for {month_name}"
         )
-    target_button.click()
+    _safe_click(page, target_button, f"calendar day {picker_target.day}", timeout=3000)
     page.wait_for_timeout(300)
     selected_days = portal.locator("button.day-button.selected").all_inner_texts()
     print(
@@ -345,7 +409,7 @@ def _jump_to_date(page, target: date) -> None:
             f"Telegram date picker confirmation button is ambiguous; buttons={details}"
         )
     confirm = visible_confirms[0]
-    confirm.click()
+    _safe_click(page, confirm, "Jump to Date confirm", js_first=True)
     try:
         confirm.wait_for(state="hidden", timeout=3000)
     except PlaywrightTimeoutError as exc:
@@ -473,6 +537,8 @@ def _harvest_day(page, target: date, max_local_steps: int = 15) -> list[dict]:
                 page.wait_for_timeout(2000)
     if last_jump_err is not None:
         raise last_jump_err
+    if not verify_anchor(page, target):
+        raise RuntimeError(f"ANCHOR_FAILED after jump to {target.isoformat()}")
     dates, _ = harvest()
     for i in range(max_local_steps):
         if any(d < target for d in dates):
@@ -480,33 +546,6 @@ def _harvest_day(page, target: date, max_local_steps: int = 15) -> list[dict]:
         _scroll_up(scroll, page)
         dates, _ = harvest()
 
-    # Telegram Web intermittently ignores a Jump to Date click (the DOM stays
-    # at the previous position).  Bounded retry: the flow is idempotent and
-    # verify_anchor still gates each landing downstream.
-    last_jump_err: Exception | None = None
-    for _attempt in range(4):
-        try:
-            _jump_to_date(page, target)
-            last_jump_err = None
-            break
-        except RuntimeError as exc:
-            last_jump_err = exc
-            print(f"[rtss-cdp] jump_retry attempt={_attempt + 1} target={target.isoformat()}")
-            if _attempt == 2:
-                # Telegram Web A silently ignores Jump to Date once its client
-                # state degrades after long sessions; a page reload restores
-                # working jumps (verified live 2026-09-15).  The URL keeps the
-                # RTSS fragment, so the client reopens the same channel.
-                print("[rtss-cdp] jump_reload_page before final attempt")
-                page.reload()
-                for _ in range(20):
-                    page.wait_for_timeout(1000)
-                    if page.locator(".MessageList").count():
-                        break
-            else:
-                page.wait_for_timeout(2000)
-    if last_jump_err is not None:
-        raise last_jump_err
     dates, _ = harvest()
     for i in range(max_local_steps):
         if any(d > target for d in dates):
@@ -653,6 +692,14 @@ def main() -> int:
             return 1
         page = candidates[0]
         _assert_client(page)
+        page.bring_to_front()
+        page.set_default_timeout(8000)
+        viewport = page.evaluate("() => ({w: innerWidth, h: innerHeight})")
+        print(f"[rtss-cdp] viewport={viewport['w']}x{viewport['h']}")
+        if viewport["w"] < 1000 or viewport["h"] < 600:
+            raise RuntimeError(
+                f"Chrome 視窗太窄/太細 ({viewport['w']}x{viewport['h']})，請將 Telegram Chrome 最大化再抓"
+            )
         rows: list[dict] = []
         if args.no_scroll:
             rows = collect_rows(page, start, end, do_scroll=False)

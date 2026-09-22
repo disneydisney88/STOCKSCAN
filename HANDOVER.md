@@ -618,3 +618,13 @@ KL 提供港股研究站 12 類財技事件（3,013 單，同花順源，`C:\dat
 - 六類既有增量 +267 單，去重鍵 (code5, event_type, announce_date)
 - **回購另開 `repurchase_daily` 表 1,000 行**（每日動作唔係事件；1,000 行疑似同花順截斷，未證實）
 - 連帶：`build_concentration_features.py` anchor 已升級用任務 X1 逐日股數
+## RTSS fetch click 卡死（2026-09-22）
+
+Telegram Web A 嘅 Jump to Date click 可能被右欄 transition、`.resize-handle`
+或 message bubble 遮住；即使 Chrome 視窗係 1920x945 都可能發生，唔可以只歸因於視窗太窄。
+`fetch_rtss_cdp.py` 會喺每個 click 前輸出 `[rtss-cdp] click ...`，Jump to Date
+及 confirm 用 JS click，月份箭咀及日期按鈕保留 pointer click 並有 JS fallback。
+主流程會先檢查 viewport（最少 1000x600），並將全局 timeout 設為 8 秒。
+Console 失敗框會顯示最後 click 及最後 TimeoutError/RuntimeError，方便定位。
+`_harvest_day` 每日只 jump 一次，再向上、向下掃描；`verify_anchor` 仍然係硬閘，
+唔會將 ANCHOR_FAILED 當成零資料。

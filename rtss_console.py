@@ -104,6 +104,14 @@ def _append_stderr_log(label: str, stderr: str) -> None:
             handle.write("\n")
 
 
+def _stderr_diagnostics(stderr: str) -> tuple[str, str]:
+    lines = [line.strip() for line in stderr.splitlines() if line.strip()]
+    click_lines = [line for line in lines if "[rtss-cdp] click " in line]
+    error_lines = [line for line in lines if "TimeoutError" in line or "RuntimeError" in line]
+    return (click_lines[-1] if click_lines else "(找不到 [rtss-cdp] click 記錄)",
+            error_lines[-1] if error_lines else "(找不到 TimeoutError/RuntimeError)")
+
+
 def _read_pipe(stream, output_queue: queue.Queue[str]) -> None:
     for line in iter(stream.readline, ""):
         output_queue.put(line)
@@ -219,7 +227,8 @@ def run_script(
             st.error(f"{label} TIMEOUT（>{timeout_s}s，process 已 kill）")
             st.caption(f"完整 stderr 已 append：{CONSOLE_ERROR_LOG}")
             stderr_tail = "\n".join(stderr.splitlines()[-20:]) or "(stderr 空白)"
-            st.code(f"COMMAND: {command_text}\n\nSTDERR (tail 20 lines):\n{stderr_tail}", language="text")
+            last_click, last_error = _stderr_diagnostics(stderr)
+            st.code(f"COMMAND: {command_text}\n\n最後 click: {last_click}\n最後錯誤: {last_error}\n\nSTDERR (tail 20 lines):\n{stderr_tail}", language="text")
         return False, stderr
     if process.returncode:
         _append_stderr_log(label, stderr)
@@ -227,7 +236,8 @@ def run_script(
             st.error(f"{label} 失敗（exit {process.returncode}）")
             st.caption(f"完整 stderr 已 append：{CONSOLE_ERROR_LOG}")
             stderr_tail = "\n".join(stderr.splitlines()[-20:]) or "(stderr 空白)"
-            st.code(f"COMMAND: {command_text}\n\nSTDERR (tail 20 lines):\n{stderr_tail}", language="text")
+            last_click, last_error = _stderr_diagnostics(stderr)
+            st.code(f"COMMAND: {command_text}\n\n最後 click: {last_click}\n最後錯誤: {last_error}\n\nSTDERR (tail 20 lines):\n{stderr_tail}", language="text")
         return False, stderr
     return True, stdout
 
