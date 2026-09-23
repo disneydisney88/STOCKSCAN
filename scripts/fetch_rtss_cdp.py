@@ -36,17 +36,58 @@ STABLE_ROUNDS_LIMIT = 20
 SCROLL_OVERLAP_RATIO = 0.6
 TITLE_DATE_RE = re.compile(r"^(\d{1,2} [A-Za-z]+ \d{4}),")
 TIME_RE = re.compile(r"\b(\d{1,2}:\d{2}:\d{2})\b")
-RTSS_URL = "https://web.telegram.org/a/#-1002795969450"
+_LAST_CLICK = "(none)"
+
+
+def _mark_click(label: str) -> None:
+    global _LAST_CLICK
+    _LAST_CLICK = label
 
 
 def _ensure_channel(page) -> None:
     """Keep the CDP page on the RTSS channel before and after UI actions."""
-    if RTSS_FRAGMENT in page.url:
+    # Unit-test fakes may model only locator actions; real Playwright pages
+    # always provide evaluate(), which is required for channel inspection.
+    if not hasattr(page, "evaluate"):
         return
-    print(f"[rtss-cdp] channel_lost url={page.url}")
-    page.goto(RTSS_URL, wait_until="domcontentloaded", timeout=10000)
-    page.wait_for_selector("#MiddleColumn .MessageList", state="visible", timeout=10000)
-    print("[rtss-cdp] channel_restored")
+    before_hash = page.evaluate("() => location.hash")
+    print(f"[rtss-cdp] channel_check phase=before hash={before_hash!r}")
+    if RTSS_FRAGMENT in before_hash:
+        return
+    item_selector = '#LeftColumn a[href="#-1002795969450"]'
+    item = page.locator(item_selector).filter(visible=True).first
+    if not item.count():
+        item = page.locator('#LeftColumn .ListItem:has-text("倍升RtSS")').filter(visible=True).first
+    if not item.count():
+        _close_scoped(page, "#LeftColumn [title='Close']", "left search close")
+        _close_scoped(page, "#LeftColumn [aria-label='Go back']", "left column back")
+        item = page.locator(item_selector).filter(visible=True).first
+        if not item.count():
+            item = page.locator('#LeftColumn .ListItem:has-text("倍升RtSS")').filter(visible=True).first
+    if not item.count():
+        raise RuntimeError("RTSS channel item not found in Telegram left column")
+    _mark_click("left-column RTSS channel")
+    print("[rtss-cdp] click left-column RTSS channel")
+    item.dispatch_event("mousedown")
+    item.dispatch_event("mouseup")
+    item.dispatch_event("click")
+    deadline = time.monotonic() + 15
+    while time.monotonic() < deadline:
+        details = page.evaluate("() => ({title: document.title, hash: location.hash})")
+        if (
+            RTSS_FRAGMENT in details["hash"]
+            and page.locator("#MiddleColumn .MessageList, #MiddleColumn").filter(visible=True).count()
+        ):
+            print(
+                f"[rtss-cdp] channel_restored title={details['title']!r} "
+                f"hash={details['hash']!r}"
+            )
+            return
+        page.wait_for_timeout(500)
+    raise RuntimeError(
+        f"RTSS channel restore failed after 15s: title={page.title()!r} "
+        f"hash={page.evaluate('() => location.hash')!r}"
+    )
 
 
 def _close_scoped(page, selector: str, label: str) -> None:
@@ -57,11 +98,22 @@ def _close_scoped(page, selector: str, label: str) -> None:
         page.wait_for_timeout(150)
 
 
-def _safe_click(page, loc, label: str, js_first: bool = False, timeout: int = 5000):
+def _safe_click(page, loc, label: str, js_first: bool = False, timeout: int = 5000, method: str = "pointer"):
     """Click a Telegram control while leaving a precise diagnostic breadcrumb."""
     _ensure_channel(page)
+    _mark_click(label)
     print(f"[rtss-cdp] click {label}")
     loc.wait_for(state="visible", timeout=timeout)
+    if method == "mouse_events":
+        loc.dispatch_event("mousedown")
+        loc.dispatch_event("mouseup")
+        loc.dispatch_event("click")
+        _ensure_channel(page)
+        return
+    if method == "force":
+        loc.click(force=True, timeout=timeout)
+        _ensure_channel(page)
+        return
     if js_first:
         loc.evaluate("el => el.click()")
         _ensure_channel(page)
@@ -119,35 +171,19 @@ def _wait_for_calendar_days(page, timeout_ms: int = 2000) -> bool:
 
 
 def _open_calendar(page):
-    """Try Telegram's four click event paths and require visible calendar days."""
+    """Use the proven mouse event sequence, then force pointer as fallback."""
     ctl = _jump_control(page)
-    methods = (
-        ("Jump to Date el.click", lambda: ctl.evaluate("el => el.click()")),
-        ("Jump to Date closest button click", lambda: ctl.evaluate(
-            "el => (el.closest('button') || el).click()"
-        )),
-        ("Jump to Date mouse event sequence", lambda: (
-            ctl.dispatch_event("mousedown"),
-            ctl.dispatch_event("mouseup"),
-            ctl.dispatch_event("click"),
-        )),
-        ("Jump to Date force pointer", lambda: ctl.click(force=True)),
-    )
-    for label, action in methods:
-        _ensure_channel(page)
-        print(f"[rtss-cdp] click {label}")
-        try:
-            action()
-            _ensure_channel(page)
-            if _wait_for_calendar_days(page):
-                print(f"[rtss-cdp] calendar_open method={label}")
-                return page.locator("#portals")
-        except PlaywrightTimeoutError:
-            pass
-        _close_scoped(page, "#portals [title='Close']", "calendar close")
-        _close_scoped(page, "#RightColumn [title='Close']", "search panel close")
-        page.wait_for_timeout(150)
-    raise RuntimeError("Jump to Date 日曆未能打開（已試 4 種 click）")
+    _safe_click(page, ctl, "Jump to Date button", method="mouse_events")
+    if _wait_for_calendar_days(page):
+        print("[rtss-cdp] calendar_open method=mouse_events")
+        return page.locator("#portals")
+    _close_scoped(page, "#portals [title='Close']", "calendar close")
+    ctl = _jump_control(page)
+    _safe_click(page, ctl, "Jump to Date button force pointer", method="force")
+    if _wait_for_calendar_days(page):
+        print("[rtss-cdp] calendar_open method=force_pointer")
+        return page.locator("#portals")
+    raise RuntimeError("Jump to Date 日曆未能打開（已試 mouse_events、force_pointer）")
 
 
 def _date_from_title(title: str) -> date | None:
@@ -464,14 +500,14 @@ def _jump_to_date(page, target: date) -> None:
             f"Telegram date picker confirmation button is ambiguous; buttons={details}"
         )
     confirm = visible_confirms[0]
-    _safe_click(page, confirm, "Jump to Date confirm", js_first=True)
+    _safe_click(page, confirm, "Jump to Date confirm", method="mouse_events")
     try:
-        confirm.wait_for(state="hidden", timeout=3000)
+        confirm.wait_for(state="hidden", timeout=1500)
     except PlaywrightTimeoutError:
-        print("[rtss-cdp] Jump to Date confirm JS click did not close portal; fallback force pointer")
-        confirm.click(force=True, timeout=2000)
+        print("[rtss-cdp] Jump to Date confirm mouse_events did not close portal; fallback force pointer")
+        _safe_click(page, confirm, "Jump to Date confirm force pointer", method="force", timeout=2000)
         try:
-            confirm.wait_for(state="hidden", timeout=3000)
+            confirm.wait_for(state="hidden", timeout=1500)
         except PlaywrightTimeoutError as exc:
             raise RuntimeError("Jump to Date confirmation did not close the calendar") from exc
     changed = False
@@ -588,12 +624,7 @@ def _harvest_day(page, target: date, max_local_steps: int = 15) -> list[dict]:
                 # working jumps (verified live 2026-09-15).  The URL keeps the
                 # RTSS fragment, so the client reopens the same channel.
                 print("[rtss-cdp] jump_reload_page before final attempt")
-                page.goto(RTSS_URL, wait_until="domcontentloaded", timeout=10000)
-                for _ in range(20):
-                    page.wait_for_timeout(1000)
-                    if RTSS_FRAGMENT in page.url and page.locator("#MiddleColumn .MessageList").count():
-                        print("[rtss-cdp] channel_restored")
-                        break
+                _ensure_channel(page)
             else:
                 page.wait_for_timeout(2000)
     if last_jump_err is not None:
@@ -752,6 +783,14 @@ def main() -> int:
             print("[rtss-cdp] RTSS Chrome page not found", file=sys.stderr)
             return 1
         page = candidates[0]
+        page.on(
+            "framenavigated",
+            lambda frame: print(
+                f"[rtss-cdp] NAV {now_hkt().isoformat()} url={frame.url} "
+                f"last_click={_LAST_CLICK}",
+                file=sys.stderr,
+            ),
+        )
         _ensure_channel(page)
         _assert_client(page)
         page.bring_to_front()
