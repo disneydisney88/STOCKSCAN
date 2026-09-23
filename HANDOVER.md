@@ -632,3 +632,13 @@ Console 失敗框會顯示最後 click 及最後 TimeoutError/RuntimeError，方
 mousedown/mouseup/click 同 force pointer；正式流程只接受 `#portals .day-button`
 真正 visible 先算日曆打開，四種都失敗會報明確錯誤。四種 click 嘅 live 結果待
 重新開啟 RTSS channel 後補記，未以未完成 probe 冒充驗收。
+
+## RTSS fetch 穩定化 2026-09-22/23
+
+- `Esc` 會令 Telegram A 離開目前 chat，RTSS fetch 永遠唔使用 Escape；portal 用 scoped close，右欄搜尋面板亦只用 scoped close。
+- `goto`／直接 hash 導航會被 Telegram A router 清走；頻道遺失時改為用 `#LeftColumn` 嘅 RTSS chat item 點返入去。
+- Telegram A 呢組控制掣實測要用 `mousedown` → `mouseup` → `click` mouse events；單純 JS `el.click()` 無效。Jump to Date 同 confirm 以 mouse events 為主，force pointer 只作 fallback。
+- `[rtss-cdp]` click 診斷 log 印 stdout；Console 必須合併捕捉 stdout/stderr，先可以顯示最後 click 同錯誤。
+- `#portals` 容器會常駐但 hidden；唔可以只等 portal，本流程等真正 visible 嘅 `#portals .day-button`。
+
+2026-09-23 live 驗收：09-23 連跑三次 exit 0，`raw_rows=1→1→1`；09-22 補抓 exit 0，`raw_rows=8`。頻道 hash 保持 `#-1002795969450`。

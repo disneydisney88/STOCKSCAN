@@ -24,6 +24,7 @@ data/cache/
 
 # pytest 殘渣（某啲測試喺 cwd 起 tmp 夾）
 .pytest-tmp*/
+.pytest-ui-temp/
 
 # 原始檔（第三階段來源）——Drive 已同步，原檔唔變動，repo 保持精簡
 data/raw/
