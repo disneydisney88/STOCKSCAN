@@ -36,14 +36,35 @@ STABLE_ROUNDS_LIMIT = 20
 SCROLL_OVERLAP_RATIO = 0.6
 TITLE_DATE_RE = re.compile(r"^(\d{1,2} [A-Za-z]+ \d{4}),")
 TIME_RE = re.compile(r"\b(\d{1,2}:\d{2}:\d{2})\b")
+RTSS_URL = "https://web.telegram.org/a/#-1002795969450"
+
+
+def _ensure_channel(page) -> None:
+    """Keep the CDP page on the RTSS channel before and after UI actions."""
+    if RTSS_FRAGMENT in page.url:
+        return
+    print(f"[rtss-cdp] channel_lost url={page.url}")
+    page.goto(RTSS_URL, wait_until="domcontentloaded", timeout=10000)
+    page.wait_for_selector("#MiddleColumn .MessageList", state="visible", timeout=10000)
+    print("[rtss-cdp] channel_restored")
+
+
+def _close_scoped(page, selector: str, label: str) -> None:
+    loc = page.locator(selector).filter(visible=True).first
+    if loc.count():
+        print(f"[rtss-cdp] click {label}")
+        loc.evaluate("el => el.click()")
+        page.wait_for_timeout(150)
 
 
 def _safe_click(page, loc, label: str, js_first: bool = False, timeout: int = 5000):
     """Click a Telegram control while leaving a precise diagnostic breadcrumb."""
+    _ensure_channel(page)
     print(f"[rtss-cdp] click {label}")
     loc.wait_for(state="visible", timeout=timeout)
     if js_first:
         loc.evaluate("el => el.click()")
+        _ensure_channel(page)
         return
     try:
         loc.scroll_into_view_if_needed(timeout=timeout)
@@ -51,6 +72,7 @@ def _safe_click(page, loc, label: str, js_first: bool = False, timeout: int = 50
     except PlaywrightTimeoutError:
         print(f"[rtss-cdp] click {label} timed out; fallback js click")
         loc.evaluate("el => el.click()")
+    _ensure_channel(page)
 
 
 def _wait_for_right_column_stable(page, samples: int = 2, interval_ms: int = 200) -> None:
@@ -112,15 +134,18 @@ def _open_calendar(page):
         ("Jump to Date force pointer", lambda: ctl.click(force=True)),
     )
     for label, action in methods:
+        _ensure_channel(page)
         print(f"[rtss-cdp] click {label}")
         try:
             action()
+            _ensure_channel(page)
             if _wait_for_calendar_days(page):
                 print(f"[rtss-cdp] calendar_open method={label}")
                 return page.locator("#portals")
         except PlaywrightTimeoutError:
             pass
-        page.keyboard.press("Escape")
+        _close_scoped(page, "#portals [title='Close']", "calendar close")
+        _close_scoped(page, "#RightColumn [title='Close']", "search panel close")
         page.wait_for_timeout(150)
     raise RuntimeError("Jump to Date 日曆未能打開（已試 4 種 click）")
 
@@ -366,8 +391,7 @@ def _jump_to_date(page, target: date) -> None:
     if stale_close.count() and stale_close.is_visible():
         try:
             if "modal-backdrop" in (stale_close.get_attribute("class") or ""):
-                print("[rtss-cdp] stale calendar backdrop detected; pressing Escape")
-                page.keyboard.press("Escape")
+                _close_scoped(page, "#portals [title='Close']", "stale calendar close")
             else:
                 _safe_click(page, stale_close, "stale calendar close")
             page.wait_for_timeout(200)
@@ -443,8 +467,13 @@ def _jump_to_date(page, target: date) -> None:
     _safe_click(page, confirm, "Jump to Date confirm", js_first=True)
     try:
         confirm.wait_for(state="hidden", timeout=3000)
-    except PlaywrightTimeoutError as exc:
-        raise RuntimeError("Jump to Date confirmation did not close the calendar") from exc
+    except PlaywrightTimeoutError:
+        print("[rtss-cdp] Jump to Date confirm JS click did not close portal; fallback force pointer")
+        confirm.click(force=True, timeout=2000)
+        try:
+            confirm.wait_for(state="hidden", timeout=3000)
+        except PlaywrightTimeoutError as exc:
+            raise RuntimeError("Jump to Date confirmation did not close the calendar") from exc
     changed = False
     after_labels = before_labels
     after_dates: set[date] = set()
@@ -559,10 +588,11 @@ def _harvest_day(page, target: date, max_local_steps: int = 15) -> list[dict]:
                 # working jumps (verified live 2026-09-15).  The URL keeps the
                 # RTSS fragment, so the client reopens the same channel.
                 print("[rtss-cdp] jump_reload_page before final attempt")
-                page.reload()
+                page.goto(RTSS_URL, wait_until="domcontentloaded", timeout=10000)
                 for _ in range(20):
                     page.wait_for_timeout(1000)
-                    if page.locator(".MessageList").count():
+                    if RTSS_FRAGMENT in page.url and page.locator("#MiddleColumn .MessageList").count():
+                        print("[rtss-cdp] channel_restored")
                         break
             else:
                 page.wait_for_timeout(2000)
@@ -717,11 +747,12 @@ def main() -> int:
     with sync_playwright() as pw:
         browser = pw.chromium.connect_over_cdp(CDP_URL)
         pages = [p for context in browser.contexts for p in context.pages]
-        candidates = [p for p in pages if "web.telegram.org" in p.url and RTSS_FRAGMENT in p.url]
+        candidates = [p for p in pages if "web.telegram.org" in p.url]
         if not candidates:
             print("[rtss-cdp] RTSS Chrome page not found", file=sys.stderr)
             return 1
         page = candidates[0]
+        _ensure_channel(page)
         _assert_client(page)
         page.bring_to_front()
         page.set_default_timeout(8000)
