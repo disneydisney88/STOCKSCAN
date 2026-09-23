@@ -1,6 +1,7 @@
 """Probe Telegram Jump to Date click event paths through the existing CDP tab."""
 from __future__ import annotations
 
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import sync_playwright
 
 
@@ -8,6 +9,7 @@ with sync_playwright() as pw:
     browser = pw.chromium.connect_over_cdp("http://127.0.0.1:9222")
     pages = [p for c in browser.contexts for p in c.pages]
     page = next(p for p in pages if "web.telegram.org" in p.url and "2795969450" in p.url)
+    page.set_default_timeout(2000)
     control_selector = (
         '#RightColumn [title="Jump to Date"], .RightColumn [title="Jump to Date"], '
         '#MiddleColumn [title="Jump to Date"]'
@@ -31,7 +33,22 @@ with sync_playwright() as pw:
     for name, action in methods:
         page.keyboard.press("Escape")
         control = page.locator(control_selector).filter(visible=True)
-        action()
-        opened = page.locator("#portals .day-button").filter(visible=True).count() > 0
+        if not control.count():
+            search = page.locator(
+                '#MiddleColumn [title="Search this chat"], '
+                '.MiddleColumn [title="Search this chat"], '
+                '#MiddleColumn [aria-label="Search this chat"]'
+            ).filter(visible=True).first
+            search.click(force=True)
+            page.wait_for_timeout(400)
+            control = page.locator(control_selector).filter(visible=True)
+        if not control.count():
+            print(f"{name}: control_missing")
+            continue
+        try:
+            action()
+            opened = page.locator("#portals .day-button").filter(visible=True).count() > 0
+        except PlaywrightTimeoutError:
+            opened = False
         print(f"{name}: {'OPEN' if opened else 'closed'}")
         page.keyboard.press("Escape")
