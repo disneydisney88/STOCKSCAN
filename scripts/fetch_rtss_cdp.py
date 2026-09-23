@@ -86,6 +86,45 @@ def _jump_control(page):
     return loc
 
 
+def _wait_for_calendar_days(page, timeout_ms: int = 2000) -> bool:
+    deadline = time.monotonic() + timeout_ms / 1000
+    days = page.locator("#portals .day-button").filter(visible=True)
+    while time.monotonic() < deadline:
+        if days.count():
+            return True
+        page.wait_for_timeout(100)
+    return False
+
+
+def _open_calendar(page):
+    """Try Telegram's four click event paths and require visible calendar days."""
+    ctl = _jump_control(page)
+    methods = (
+        ("Jump to Date el.click", lambda: ctl.evaluate("el => el.click()")),
+        ("Jump to Date closest button click", lambda: ctl.evaluate(
+            "el => (el.closest('button') || el).click()"
+        )),
+        ("Jump to Date mouse event sequence", lambda: (
+            ctl.dispatch_event("mousedown"),
+            ctl.dispatch_event("mouseup"),
+            ctl.dispatch_event("click"),
+        )),
+        ("Jump to Date force pointer", lambda: ctl.click(force=True)),
+    )
+    for label, action in methods:
+        print(f"[rtss-cdp] click {label}")
+        try:
+            action()
+            if _wait_for_calendar_days(page):
+                print(f"[rtss-cdp] calendar_open method={label}")
+                return page.locator("#portals")
+        except PlaywrightTimeoutError:
+            pass
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(150)
+    raise RuntimeError("Jump to Date 日曆未能打開（已試 4 種 click）")
+
+
 def _date_from_title(title: str) -> date | None:
     match = TITLE_DATE_RE.search(title or "")
     if not match:
@@ -335,15 +374,7 @@ def _jump_to_date(page, target: date) -> None:
         except PlaywrightTimeoutError:
             pass
     _ensure_jump_control(page)
-    ctl = _jump_control(page)
-    _safe_click(page, ctl, "Jump to Date", js_first=True)
-    portal = page.locator("#portals")
-    try:
-        portal.wait_for(state="visible", timeout=3000)
-    except PlaywrightTimeoutError:
-        print("[rtss-cdp] Jump to Date JS click did not open portal; fallback dispatch_event")
-        ctl.dispatch_event("click")
-        portal.wait_for(state="visible", timeout=3000)
+    portal = _open_calendar(page)
     for _ in range(15):
         if [line.strip() for line in portal.inner_text().splitlines() if line.strip()]:
             break

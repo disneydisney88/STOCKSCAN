@@ -628,3 +628,6 @@ Telegram Web A 嘅 Jump to Date click 可能被右欄 transition、`.resize-hand
 Console 失敗框會顯示最後 click 及最後 TimeoutError/RuntimeError，方便定位。
 `_harvest_day` 每日只 jump 一次，再向上、向下掃描；`verify_anchor` 仍然係硬閘，
 唔會將 ANCHOR_FAILED 當成零資料。
+實測 click probe 以 `scripts/probe_jump_click.py` 逐試 `el.click()`、closest button、
+mousedown/mouseup/click 同 force pointer；正式流程只接受 `#portals .day-button`
+真正 visible 先算日曆打開，四種都失敗會報明確錯誤。

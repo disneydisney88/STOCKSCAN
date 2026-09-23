@@ -1,0 +1,37 @@
+"""Probe Telegram Jump to Date click event paths through the existing CDP tab."""
+from __future__ import annotations
+
+from playwright.sync_api import sync_playwright
+
+
+with sync_playwright() as pw:
+    browser = pw.chromium.connect_over_cdp("http://127.0.0.1:9222")
+    pages = [p for c in browser.contexts for p in c.pages]
+    page = next(p for p in pages if "web.telegram.org" in p.url and "2795969450" in p.url)
+    control_selector = (
+        '#RightColumn [title="Jump to Date"], .RightColumn [title="Jump to Date"], '
+        '#MiddleColumn [title="Jump to Date"]'
+    )
+    control = page.locator(control_selector).filter(visible=True)
+    if not control.count():
+        search = page.locator(
+            '#MiddleColumn [title="Search this chat"], '
+            '.MiddleColumn [title="Search this chat"], '
+            '#MiddleColumn [aria-label="Search this chat"]'
+        ).filter(visible=True).first
+        search.click(force=True)
+        page.wait_for_timeout(800)
+        control = page.locator(control_selector).filter(visible=True)
+    methods = [
+        ("el.click", lambda: control.evaluate("el => el.click()")),
+        ("closest_button.click", lambda: control.evaluate("el => (el.closest('button') || el).click()")),
+        ("mouse_events", lambda: [control.dispatch_event(x) for x in ("mousedown", "mouseup", "click")]),
+        ("force_pointer", lambda: control.click(force=True)),
+    ]
+    for name, action in methods:
+        page.keyboard.press("Escape")
+        control = page.locator(control_selector).filter(visible=True)
+        action()
+        opened = page.locator("#portals .day-button").filter(visible=True).count() > 0
+        print(f"{name}: {'OPEN' if opened else 'closed'}")
+        page.keyboard.press("Escape")
