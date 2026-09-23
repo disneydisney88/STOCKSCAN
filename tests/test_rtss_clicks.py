@@ -32,9 +32,13 @@ class _Locator:
         self.evaluated.append(expression)
 
 
+class _Page:
+    url = "https://web.telegram.org/a/#-1002795969450"
+
+
 def test_safe_click_falls_back_to_js_after_pointer_timeout(capsys):
     module = _module()
     locator = _Locator()
-    module._safe_click(object(), locator, "test control")
+    module._safe_click(_Page(), locator, "test control")
     assert locator.evaluated == ["el => el.click()"]
     assert "[rtss-cdp] click test control" in capsys.readouterr().out
